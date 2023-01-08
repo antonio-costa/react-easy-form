@@ -1,18 +1,24 @@
 import { useCallback } from "react";
-import { getCheckboxValue, getFieldValue, getRadioValue, isCheckboxField, isRadioField } from "./getFieldValue";
-import { FieldValue, FormId, HTMLFormFieldElement } from "./useForm";
+import {
+  getCheckboxValue,
+  getRadioValue,
+  getSelectValue,
+  isCheckboxField,
+  isRadioField,
+  isSelectField,
+  typifyFieldValue,
+} from "./getFieldValue";
+import { FieldValuePrimitive, FormId, HTMLFormField, HTMLFormFieldElement } from "./useForm";
 import { formSelector } from "./util";
 
-export type GetValue = (fieldNameOrRefs: string | HTMLFormFieldElement[]) => FieldValue;
+export type GetValue = (fieldNameOrRefs: string | HTMLFormField) => FieldValuePrimitive;
 
 export const useGetValue = (formId: FormId): GetValue => {
   return useCallback(
-    (fieldNameOrRefs: string | HTMLFormFieldElement[]) => {
+    (fieldNameOrRefs: string | HTMLFormField) => {
       const fieldsSelector =
         typeof fieldNameOrRefs === "string"
-          ? (Array.from(
-              document.querySelectorAll(`${formSelector(formId)} [name=${fieldNameOrRefs}]`)
-            ) as HTMLFormFieldElement[])
+          ? (Array.from(document.querySelectorAll(`${formSelector(formId)} [name='${fieldNameOrRefs}']`)) as HTMLFormField)
           : fieldNameOrRefs;
 
       if (!fieldsSelector.length) return undefined;
@@ -23,8 +29,10 @@ export const useGetValue = (formId: FormId): GetValue => {
       if (isRadioField(fieldsSelector)) {
         return getRadioValue(fieldsSelector as HTMLInputElement[]);
       }
-
-      return getFieldValue(fieldsSelector[0] as HTMLFormFieldElement);
+      if (isSelectField(fieldsSelector)) {
+        return getSelectValue(fieldsSelector[0] as HTMLSelectElement);
+      }
+      return typifyFieldValue(fieldsSelector[0].value, (fieldsSelector[0] as HTMLFormFieldElement)?.type);
     },
     [formId]
   );

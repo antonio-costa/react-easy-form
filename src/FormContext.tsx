@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import { FormContextValue } from "./useForm";
 
 export const FormContext = createContext<FormContextValue>({
-  fields: [],
+  fieldElements: [],
   formId: "",
   getValue: () => undefined,
   getValues: () => ({}),

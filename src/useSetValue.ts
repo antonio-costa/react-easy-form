@@ -1,12 +1,12 @@
 import { useCallback } from "react";
 import { isCheckboxField, isRadioField, isValidField } from "./getFieldValue";
-import { FieldValue, FormId } from "./useForm";
-import { formNumericalTypes, getFieldElements } from "./util";
+import { FieldValuePrimitive, FormId } from "./useForm";
+import { formNumericalTypes, getField } from "./util";
 
 export const useSetValue = (formId: FormId) => {
   return useCallback(
-    (fieldName: string, value: FieldValue) => {
-      const fieldEls = getFieldElements(fieldName, formId);
+    (fieldName: string, value: FieldValuePrimitive) => {
+      const fieldEls = getField(fieldName, formId);
 
       if (!fieldEls.length) return;
 

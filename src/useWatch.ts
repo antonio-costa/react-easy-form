@@ -1,69 +1,134 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext } from "./FormContext";
-import { getCheckboxValue, getFieldValue, isCheckboxField, isRadioField } from "./getFieldValue";
-import { FieldValue, HTMLFormFieldElement } from "./useForm";
+import { getFieldValue, isCheckboxField, isRadioField } from "./getFieldValue";
+import {
+  FieldGroupValues,
+  FieldValue,
+  FieldValuePrimitive,
+  FormContextValue,
+  HTMLFormField,
+  HTMLFormFieldElement,
+  HTMLFormFieldRecord,
+} from "./useForm";
 import { useGetValue } from "./useGetValue";
-import { formSelector } from "./util";
+import { useGetValues } from "./useGetValues";
+import { ObservableObserveCallback } from "./useSubscribable/useSubscribable";
+import { arrayRecordShallowEqual, dotNotationSetValue, getFieldsRecordFromFieldElements } from "./util";
 
-// input vs change events
-// https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/input_event
+export type RegisterFieldEvent = (field: HTMLFormField) => () => void;
+export type RegisterPathFieldsEvents = (fields: HTMLFormField[]) => () => void;
 
-export const useWatch = (fieldName: string) => {
-  const form = useFormContext();
+// TODO: useTransition + optimize registerSingleFieldEvent()
 
-  const fields = useRef<HTMLFormFieldElement[]>([]);
+export const useWatch = <T extends FieldGroupValues | FieldValuePrimitive>(
+  fieldNameOrPath: string,
+  customFormCtx?: FormContextValue
+) => {
+  const formContext = useFormContext();
+  const form = customFormCtx || formContext;
 
-  useEffect(() => {
-    fields.current = Array.from(
-      document.querySelectorAll(`${formSelector(form.formId)} [name=${fieldName}]`)
-    ) as HTMLFormFieldElement[];
-  }, [fieldName, form.formId]);
+  const getValue = useGetValue(form.formId);
+  const getValues = useGetValues(form.fieldElements, getValue);
+
+  const fields = useRef<HTMLFormFieldRecord>({});
+  const unsub = useRef<() => void>(() => null);
+
+  const isPath = useMemo(() => fieldNameOrPath.endsWith("."), [fieldNameOrPath]);
 
   const [value, setValue] = useState<FieldValue>();
 
-  const getValue = useGetValue(form.formId);
+  const subscribeField = useCallback(
+    (field: HTMLFormField): (() => void) => {
+      const cb = () => {
+        const fieldValue = getFieldValue(field);
 
-  useEffect(() => {
-    if (!fields.current.length) {
-      return () => undefined;
-    }
-    const fieldValue = getValue(fieldName);
-
-    if (isCheckboxField(fields.current)) {
-      const cb = (e: Event) => {
-        setValue(getCheckboxValue(e.currentTarget as HTMLInputElement));
-      };
-      fields.current[0].addEventListener("change", cb);
-      setValue(fieldValue);
-
-      return () => {
-        fields.current[0].removeEventListener("change", cb);
-      };
-    }
-    if (isRadioField(fields.current)) {
-      const cb = (e: Event) => {
-        if ((e.currentTarget as HTMLInputElement).checked) {
-          setValue((e.currentTarget as HTMLInputElement).value);
+        // not using getValue() / getValues() for performance reasons
+        if (isPath) {
+          setValue((old) => {
+            return { ...dotNotationSetValue(old, field[0].name, fieldValue) };
+          });
+        } else {
+          setValue(fieldValue);
         }
       };
-      fields.current.forEach((field) => field.addEventListener("change", cb));
-      setValue(fieldValue);
+
+      // if checkbox or radio, listen to "change" event and retrieve specific value
+      // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/input_event
+      const eventName = isCheckboxField(field) || isRadioField(field) ? "change" : "input";
+
+      const unsubFuncs = field.map((fieldElement) => {
+        fieldElement.addEventListener(eventName, cb);
+
+        return () => {
+          fieldElement.removeEventListener(eventName, cb);
+
+          /* if (isPath) {
+            setValue(getValues(fieldNameOrPath));
+          } else {
+            setValue(undefined);
+          } */
+        };
+      });
 
       return () => {
-        fields.current.forEach((field) => field.removeEventListener("change", cb));
+        unsubFuncs.forEach((f) => f());
       };
+    },
+    [isPath]
+  );
+
+  const registerPathFieldsEvents: RegisterPathFieldsEvents = useCallback(
+    (fieldsArray) => {
+      const fieldsValues = getValues(fieldNameOrPath);
+      setValue(fieldsValues);
+      const unsubFunctions = fieldsArray.map((field) => subscribeField(field));
+      return () => {
+        unsubFunctions.forEach((f) => f());
+      };
+    },
+    [fieldNameOrPath, getValues, subscribeField]
+  );
+
+  const registerSingleFieldEvent: RegisterFieldEvent = useCallback(
+    (field: HTMLFormField) => {
+      const fieldValue = getValue(field);
+      setValue(fieldValue);
+      return subscribeField(field);
+    },
+    [getValue, subscribeField]
+  );
+  const observeCallback = useCallback<ObservableObserveCallback<HTMLFormFieldElement[]>>(
+    (newFieldElements) => {
+      const newFields = getFieldsRecordFromFieldElements(
+        newFieldElements.filter((field) =>
+          isPath ? field.name.startsWith(fieldNameOrPath) : field.name === fieldNameOrPath
+        )
+      );
+      if (!arrayRecordShallowEqual(newFields, fields.current)) {
+        unsub.current();
+        const newFieldsArray = Object.values(newFields);
+        if (newFieldsArray.length) {
+          unsub.current = isPath ? registerPathFieldsEvents(newFieldsArray) : registerSingleFieldEvent(newFieldsArray[0]);
+        } else {
+          unsub.current = () => null;
+        }
+
+        fields.current = newFields;
+      }
+    },
+    [fieldNameOrPath, isPath, registerPathFieldsEvents, registerSingleFieldEvent]
+  );
+
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      observeCallback(form.fieldElements.current);
+      form.fieldElements.observe(observeCallback);
+      isFirstRender.current = false;
     }
+  }, [form, form.fieldElements, observeCallback]);
 
-    const cb = (e: Event) => {
-      setValue(getFieldValue(e.currentTarget as HTMLFormFieldElement));
-    };
-    fields.current[0].addEventListener("input", cb);
-    setValue(fieldValue);
-
-    return () => {
-      fields.current[0].removeEventListener("input", cb);
-    };
-  }, [fieldName, fields, getValue]);
-
-  return value;
+  // "as T" is a typescript helper
+  // it is not guaranteed value is actually of type T
+  return value as T;
 };
