@@ -1,9 +1,15 @@
 import { useCallback } from "react";
 import { isCheckboxField, isRadioField, isValidField } from "./getFieldValue";
-import { FieldValuePrimitive, FormId } from "./useForm";
+import { FieldValuePrimitive, FormFieldValues, FormId } from "./useForm";
+import { Observable } from "./useSubscribable/useSubscribable";
 import { formNumericalTypes, getField } from "./util";
 
-export const useSetValue = (formId: FormId) => {
+export interface UseSetValueProps {
+  formId: FormId;
+  fieldValues: Observable<FormFieldValues>;
+}
+
+export const useSetValue = ({ formId, fieldValues }: UseSetValueProps) => {
   return useCallback(
     (fieldName: string, value: FieldValuePrimitive) => {
       const fieldEls = getField(fieldName, formId);
@@ -22,6 +28,13 @@ export const useSetValue = (formId: FormId) => {
           (fieldEls as HTMLInputElement[]).forEach((el) => {
             if (el.name === fieldName) {
               el.checked = true;
+              fieldValues.setValue(
+                (old) => {
+                  old[fieldName] = el.value;
+                  return { ...old };
+                },
+                [fieldName]
+              );
             } else {
               el.checked = false;
             }
@@ -37,7 +50,18 @@ export const useSetValue = (formId: FormId) => {
         if (typeof value !== expectedType) {
           throw new Error(`Input [${fieldName}] expected ${expectedType} but got ${value} (${typeof value})`);
         }
-        fieldEls[0].value = typeof value === "number" ? String(value) : (value as string);
+
+        const fValue = typeof value === "number" ? String(value) : (value as string);
+        fieldValues.setValue(
+          (old) => {
+            old[fieldEls[0].name] = fValue;
+            return { ...old };
+          },
+          [fieldEls[0].name]
+        );
+
+        fieldEls[0].value = fValue;
+
         (fieldEls[0] as HTMLInputElement).dispatchEvent(new Event("input"));
       } else {
         throw new Error(`Could not set value for ${fieldName}.`);

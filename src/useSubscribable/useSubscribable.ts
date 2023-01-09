@@ -50,7 +50,13 @@ export const useObservableRef = <T>(initialValue: T): Observable<T> => {
         subscriptions.current.forEach((cb) => cb(value.current));
 
         if (triggerKeyObservables) {
-          triggerKeyObservables.forEach((key) => (keySubscriptions.current[key] || []).forEach((cb) => cb(value.current)));
+          triggerKeyObservables.forEach((triggeredKey) => {
+            Object.keys(keySubscriptions.current).forEach((subscriptionKey) => {
+              if (triggeredKey.startsWith(subscriptionKey)) {
+                keySubscriptions.current[subscriptionKey].forEach((cb) => cb(value.current));
+              }
+            });
+          });
         }
       },
     };

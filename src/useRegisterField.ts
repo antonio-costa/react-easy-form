@@ -36,13 +36,13 @@ export const useRegisterField = ({
         });
       });
       // remove value from list of fieldValues
-      fieldValues.setValue(
+      /* fieldValues.setValue(
         (old) => {
           delete old[name];
           return { ...old };
         },
         [name]
-      );
+      ); */
       // remove value from list of defaultValues
       if (defaultValues.current[name]) delete defaultValues.current[name];
     },

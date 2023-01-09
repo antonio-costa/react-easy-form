@@ -23,7 +23,7 @@ export type FieldGroupValues = { [fieldName: string]: FieldValuePrimitive | Fiel
 export type FieldValue = FieldValuePrimitive | FieldGroupValues;
 export type FormId = string;
 export type UseForm = typeof useForm;
-
+export type FormFieldValues = Record<string, FieldValue>;
 /*
   NOTE:
     In order to unify how to handle all inputs internally, a "field" is defined
@@ -57,13 +57,13 @@ export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroup
 const useForm = (formId: string): FormContextValue => {
   const fieldElements = useObservableRef<HTMLFormFieldElement[]>([]);
   const defaultValues = useRef<Record<string, any>>({});
-  const fieldValues = useObservableRef<Record<string, FieldValue>>({});
+  const fieldValues = useObservableRef<FormFieldValues>({});
 
   const { registerForm, executeSubmit } = useRegisterForm(formId);
   const getValue = useGetValue(formId);
   const getValues = useGetValues(fieldElements, getValue);
   const register = useRegisterField({ fieldElements, defaultValues, fieldValues, formId }); // fieldElements & defaultValues are mutated inside this function
-  const setValue = useSetValue(formId);
+  const setValue = useSetValue({ formId, fieldValues });
   const isDirty = useIsDirty(defaultValues, getValue, fieldElements);
 
   return useMemo(

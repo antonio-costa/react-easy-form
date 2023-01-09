@@ -100,6 +100,8 @@ function App() {
             </fieldset> */}
             <button type="submit">Submit form</button>
             <ToggleableTextArea />
+            <StressValues />
+
             {/* <SelfContainedDebug /> */}
             {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 100px)" }}>
@@ -131,9 +133,6 @@ const StressTestInput = ({ name }: { name: string }) => {
   const form = useFormContext();
   const value = useWatchV1<string>(`stress.${name}`);
 
-  useEffect(() => {
-    // console.log(`stress.${name}`, value);
-  }, [name, value]);
   return (
     <fieldset>
       <label>{`stress.${name} (${value})`}</label>
@@ -141,7 +140,16 @@ const StressTestInput = ({ name }: { name: string }) => {
     </fieldset>
   );
 };
+const StressValues = () => {
+  const stressValues = useWatchV1("person.");
 
+  return (
+    <div>
+      stress values
+      <pre>{JSON.stringify(stressValues, null, 2)}</pre>
+    </div>
+  );
+};
 const ToggleableTextArea = memo(() => {
   const form = useFormContext();
   const [visible, setVisible] = useState(true);
@@ -165,6 +173,14 @@ const ToggleableTextArea = memo(() => {
       <br />
       <button type="button" onClick={onClick}>
         Hide/show textarea
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          form.setValue("description", "AAAA");
+        }}
+      >
+        change description value to &quot;AAAA&quot;
       </button>
     </div>
   );
