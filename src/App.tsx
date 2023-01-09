@@ -3,6 +3,7 @@ import { FormProvider, useFormContext } from "./FormContext";
 import { useForm } from "./useForm";
 import { Observable, useObservableRef, useObserve } from "./useSubscribable/useSubscribable";
 import { useWatch } from "./useWatch";
+import { useWatchV1 } from "./useWatchV1";
 
 /* interface RegisterForm {
   person: {
@@ -24,12 +25,6 @@ function App() {
   const onSubmit = useCallback((validation: any, e: React.FormEvent<HTMLFormElement>) => {
     console.log("TEST SUBMIT", validation, e);
   }, []);
-
-  const value = useWatch<string>(`stress.`, form);
-
-  useEffect(() => {
-    // console.log(value);
-  }, [value]);
 
   const count = useObservableRef(0);
   return (
@@ -104,11 +99,11 @@ function App() {
               </select>
             </fieldset> */}
             <button type="submit">Submit form</button>
-            {/* <ToggleableTextArea /> */}
+            <ToggleableTextArea />
             {/* <SelfContainedDebug /> */}
             {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 100px)" }}>
-                {Array.from({ length: 1 }, (_, i) => (
+                {Array.from({ length: 1000 }, (_, i) => (
                   <StressTestInput name={`test-${i}`} key={i} />
                 ))}
               </div>
@@ -134,11 +129,15 @@ const RerenderableComponent = ({ value }: { value: Observable<number> }) => {
 };
 const StressTestInput = ({ name }: { name: string }) => {
   const form = useFormContext();
+  const value = useWatchV1<string>(`stress.${name}`);
 
+  useEffect(() => {
+    // console.log(`stress.${name}`, value);
+  }, [name, value]);
   return (
     <fieldset>
-      <label>{`stress.${name}`}</label>
-      <input style={{ width: 80 }} {...form.register(`stress.${name}`)} />
+      <label>{`stress.${name} (${value})`}</label>
+      <input style={{ width: 80 }} {...form.register(`stress.${name}`)} defaultValue={`def ${name}`} />
     </fieldset>
   );
 };
@@ -151,13 +150,13 @@ const ToggleableTextArea = memo(() => {
     setVisible((old) => !old);
   };
 
-  const description = useWatch<string>("description");
+  const description = useWatchV1<string>("description");
 
   return (
     <div>
       {visible ? (
         <fieldset>
-          <label>Description</label>
+          <label>Description {description}</label>
           <textarea {...form.register("description")} />
         </fieldset>
       ) : null}

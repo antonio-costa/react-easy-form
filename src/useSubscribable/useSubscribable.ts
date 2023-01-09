@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type ObservableObserveCallback<T> = (value: T) => void;
-export type ObservableObserve<T> = (cb: ObservableObserveCallback<T>) => () => void;
+export type ObservableObserve<T> = (cb: ObservableObserveCallback<T>, key?: string) => () => void;
+export type SetObservable<T> = (newValue: T | ((old: T) => T), triggerKeyObservables?: string[]) => void;
 
 export type Observable<T> = {
   current: T;
   observe: ObservableObserve<T>;
   setValue: SetObservable<T>;
 };
-export type SetObservable<T> = (newValue: T | ((old: T) => T)) => void;
 
 export const useObservableRef = <T>(initialValue: T): Observable<T> => {
   const value = useRef<T>(initialValue);
   const subscriptions = useRef<ObservableObserveCallback<T>[]>([]);
+  const keySubscriptions = useRef<Record<string, ObservableObserveCallback<T>[]>>({});
+
   return useMemo(() => {
     const subscribable: Observable<T> = {
       get current() {
@@ -21,19 +23,35 @@ export const useObservableRef = <T>(initialValue: T): Observable<T> => {
       set current(_) {
         throw new Error("Cannot mutate directly an observable. Use setValue() function.");
       },
-      observe: (cb) => {
-        subscriptions.current.push(cb);
+      observe: (cb, key) => {
+        if (key) {
+          if (keySubscriptions.current[key]) {
+            keySubscriptions.current[key].push(cb);
+          } else {
+            keySubscriptions.current[key] = [cb];
+          }
+        } else {
+          subscriptions.current.push(cb);
+        }
         return () => {
-          subscriptions.current = subscriptions.current.filter((findCb) => findCb !== cb);
+          if (key && keySubscriptions.current[key]) {
+            keySubscriptions.current[key] = keySubscriptions.current[key].filter((findCb) => findCb !== cb);
+          } else {
+            subscriptions.current = subscriptions.current.filter((findCb) => findCb !== cb);
+          }
         };
       },
-      setValue: (newValue) => {
+      setValue: (newValue, triggerKeyObservables) => {
         if (newValue instanceof Function) {
           value.current = newValue(value.current);
         } else {
           value.current = newValue;
         }
         subscriptions.current.forEach((cb) => cb(value.current));
+
+        if (triggerKeyObservables) {
+          triggerKeyObservables.forEach((key) => (keySubscriptions.current[key] || []).forEach((cb) => cb(value.current)));
+        }
       },
     };
     return subscribable;

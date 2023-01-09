@@ -32,6 +32,7 @@ export type UseForm = typeof useForm;
 
 export type FormContextValue = {
   fieldElements: Observable<HTMLFormField>;
+  fieldValues: Observable<Record<string, FieldValue>>;
   formId: FormId;
   getValue: GetValue;
   getValues: GetValues;
@@ -56,17 +57,29 @@ export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroup
 const useForm = (formId: string): FormContextValue => {
   const fieldElements = useObservableRef<HTMLFormFieldElement[]>([]);
   const defaultValues = useRef<Record<string, any>>({});
+  const fieldValues = useObservableRef<Record<string, FieldValue>>({});
 
-  const register = useRegisterField({ fieldElements, defaultValues }); // fieldElements & defaultValues are mutated inside this function
   const { registerForm, executeSubmit } = useRegisterForm(formId);
   const getValue = useGetValue(formId);
   const getValues = useGetValues(fieldElements, getValue);
+  const register = useRegisterField({ fieldElements, defaultValues, fieldValues, formId }); // fieldElements & defaultValues are mutated inside this function
   const setValue = useSetValue(formId);
   const isDirty = useIsDirty(defaultValues, getValue, fieldElements);
 
   return useMemo(
-    () => ({ register, registerForm, executeSubmit, getValue, getValues, fieldElements, formId, setValue, isDirty }),
-    [register, registerForm, executeSubmit, getValue, getValues, fieldElements, formId, setValue, isDirty]
+    () => ({
+      register,
+      registerForm,
+      executeSubmit,
+      getValue,
+      getValues,
+      fieldElements,
+      fieldValues,
+      formId,
+      setValue,
+      isDirty,
+    }),
+    [register, registerForm, executeSubmit, getValue, getValues, fieldElements, fieldValues, formId, setValue, isDirty]
   );
 };
 

@@ -13,7 +13,7 @@ import {
 import { useGetValue } from "./useGetValue";
 import { useGetValues } from "./useGetValues";
 import { ObservableObserveCallback } from "./useSubscribable/useSubscribable";
-import { arrayRecordShallowEqual, dotNotationSetValue, getFieldsRecordFromFieldElements } from "./util";
+import { arrayRecordShallowEqual, getFieldsRecordFromFieldElements } from "./util";
 
 export type RegisterFieldEvent = (field: HTMLFormField) => () => void;
 export type RegisterPathFieldsEvents = (fields: HTMLFormField[]) => () => void;
@@ -35,7 +35,7 @@ export const useWatch = <T extends FieldGroupValues | FieldValuePrimitive>(
 
   const isPath = useMemo(() => fieldNameOrPath.endsWith("."), [fieldNameOrPath]);
 
-  const [value, setValue] = useState<FieldValue>();
+  const [value, setValue] = useState<FieldValue>(!isPath ? getValue(fieldNameOrPath) : getValues(fieldNameOrPath));
 
   const subscribeField = useCallback(
     (field: HTMLFormField): (() => void) => {
@@ -45,7 +45,7 @@ export const useWatch = <T extends FieldGroupValues | FieldValuePrimitive>(
         // not using getValue() / getValues() for performance reasons
         if (isPath) {
           setValue((old) => {
-            return { ...dotNotationSetValue(old, field[0].name, fieldValue) };
+            return getValues(fieldNameOrPath); // { ...dotNotationSetValue(old, field[0].name, fieldValue) };
           });
         } else {
           setValue(fieldValue);
@@ -79,23 +79,19 @@ export const useWatch = <T extends FieldGroupValues | FieldValuePrimitive>(
 
   const registerPathFieldsEvents: RegisterPathFieldsEvents = useCallback(
     (fieldsArray) => {
-      const fieldsValues = getValues(fieldNameOrPath);
-      setValue(fieldsValues);
       const unsubFunctions = fieldsArray.map((field) => subscribeField(field));
       return () => {
         unsubFunctions.forEach((f) => f());
       };
     },
-    [fieldNameOrPath, getValues, subscribeField]
+    [subscribeField]
   );
 
   const registerSingleFieldEvent: RegisterFieldEvent = useCallback(
     (field: HTMLFormField) => {
-      const fieldValue = getValue(field);
-      setValue(fieldValue);
       return subscribeField(field);
     },
-    [getValue, subscribeField]
+    [subscribeField]
   );
   const observeCallback = useCallback<ObservableObserveCallback<HTMLFormFieldElement[]>>(
     (newFieldElements) => {

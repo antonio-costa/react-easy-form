@@ -1,16 +1,31 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { isCheckboxField, isRadioField, isRangeField, isSelectField, isValidField, typifyFieldValue } from "./getFieldValue";
-import { HTMLFormFieldElement } from "./useForm";
+import { FieldValue, FormId, HTMLFormFieldElement } from "./useForm";
+import { useGetValue } from "./useGetValue";
 import { Observable } from "./useSubscribable/useSubscribable";
 
 export type RegisterFieldOptions = { defaultSelectOption?: string; radioValue?: string };
-export type RegisterFieldValue = { name: string; ref: any; value?: string };
+export type RegisterFieldValue = {
+  name: string;
+  ref: any;
+  value?: string;
+  onChange: React.ChangeEventHandler<HTMLFormFieldElement> | undefined;
+};
 export type RegisterField = (name: string, options?: RegisterFieldOptions) => RegisterFieldValue;
 export type UseRegisterFieldProps = {
   fieldElements: Observable<HTMLFormFieldElement[]>;
   defaultValues: React.MutableRefObject<Record<string, any>>;
+  fieldValues: Observable<Record<string, FieldValue>>;
+  formId: FormId;
 };
-export const useRegisterField = ({ fieldElements, defaultValues }: UseRegisterFieldProps): RegisterField => {
+export const useRegisterField = ({
+  fieldElements,
+  defaultValues,
+  fieldValues,
+  formId,
+}: UseRegisterFieldProps): RegisterField => {
+  const getValue = useGetValue(formId);
+
   const unregisterRef = useCallback(
     (name: string, registerOptions?: RegisterFieldOptions) => {
       // remove element from fieldElements
@@ -20,11 +35,18 @@ export const useRegisterField = ({ fieldElements, defaultValues }: UseRegisterFi
           return oldEl.name !== name || registerOptions.radioValue !== oldEl.value;
         });
       });
-
+      // remove value from list of fieldValues
+      fieldValues.setValue(
+        (old) => {
+          delete old[name];
+          return { ...old };
+        },
+        [name]
+      );
       // remove value from list of defaultValues
       if (defaultValues.current[name]) delete defaultValues.current[name];
     },
-    [defaultValues, fieldElements]
+    [defaultValues, fieldElements, fieldValues]
   );
   const registerRef = useCallback(
     (ref: HTMLFormFieldElement | null, name: string, registerOptions?: RegisterFieldOptions) => {
@@ -40,10 +62,18 @@ export const useRegisterField = ({ fieldElements, defaultValues }: UseRegisterFi
         });
       }
 
+      // set value
+      fieldValues.setValue(
+        (old) => {
+          old[name] = getValue(name);
+          return { ...old };
+        },
+        [name]
+      );
+
       // default values are used to test if field is dirty
       // if the default value is updated, then the isDirty
       // will use the new defaultValue to make the comparison
-
       if (isCheckboxField([ref])) {
         defaultValues.current[name] = (ref as HTMLInputElement).defaultChecked;
       } else if (isRadioField([ref])) {
@@ -80,12 +110,29 @@ export const useRegisterField = ({ fieldElements, defaultValues }: UseRegisterFi
         }
       }
     },
-    [defaultValues, fieldElements, unregisterRef]
+    [defaultValues, fieldElements, fieldValues, getValue, unregisterRef]
+  );
+
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLFormFieldElement>) => {
+      fieldValues.setValue(
+        (old) => {
+          const name = e.currentTarget.name;
+          return { ...old, [name]: e.currentTarget.value };
+        },
+        [e.currentTarget.name]
+      );
+    },
+    [fieldValues]
   );
 
   return useCallback(
     (name, options) => {
-      const r: RegisterFieldValue = { name, ref: (ref: HTMLFormFieldElement | null) => registerRef(ref, name, options) };
+      const r: RegisterFieldValue = {
+        name,
+        ref: (ref: HTMLFormFieldElement | null) => registerRef(ref, name, options),
+        onChange,
+      };
 
       if (options?.radioValue) {
         r.value = options.radioValue;
@@ -93,6 +140,6 @@ export const useRegisterField = ({ fieldElements, defaultValues }: UseRegisterFi
 
       return r;
     },
-    [registerRef]
+    [onChange, registerRef]
   );
 };
