@@ -1,130 +1,93 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "./FormContext";
-import { getFieldValue, isCheckboxField, isRadioField } from "./getFieldValue";
-import {
-  FieldGroupValues,
-  FieldValue,
-  FieldValuePrimitive,
-  FormContextValue,
-  HTMLFormField,
-  HTMLFormFieldElement,
-  HTMLFormFieldRecord,
-} from "./useForm";
-import { useGetValue } from "./useGetValue";
-import { useGetValues } from "./useGetValues";
-import { ObservableObserveCallback } from "./useSubscribable/useSubscribable";
-import { arrayRecordShallowEqual, getFieldsRecordFromFieldElements } from "./util";
+import { FieldError, FieldGroupErrors, FieldValue, FormContextValue } from "./useForm";
+import { flattenObject, getNestedValue } from "./util/misc";
 
-export type RegisterFieldEvent = (field: HTMLFormField) => () => void;
-export type RegisterPathFieldsEvents = (fields: HTMLFormField[]) => () => void;
+export interface UseWatchOptions {
+  watchValues?: boolean;
+  watchErrors?: boolean;
+  formContext?: FormContextValue;
+  flattenErrorObject?: boolean;
+  flattenValidationObject?: boolean;
+}
 
-// TODO: useTransition + optimize registerSingleFieldEvent()
+const flattenIfRequired = (object: Record<string, FieldError | FieldValue>, shouldFlatten?: boolean) => ({
+  ...(shouldFlatten ? flattenObject(object) : object),
+});
 
-export const useWatch = <T extends FieldGroupValues | FieldValuePrimitive>(
-  fieldNameOrPath: string,
-  customFormCtx?: FormContextValue
-) => {
+export const useWatch = (fieldNameOrPath?: string, options?: UseWatchOptions) => {
+  const { watchValues, watchErrors, formContext: customFormCtx } = options || {};
+
   const formContext = useFormContext();
   const form = customFormCtx || formContext;
 
-  const getValue = useGetValue(form.formId);
-  const getValues = useGetValues(form.fieldElements, getValue);
+  const [values, setValues] = useState<FieldValue>();
+  const [errors, setErrors] = useState<FieldGroupErrors | FieldError>();
 
-  const fields = useRef<HTMLFormFieldRecord>({});
-  const unsub = useRef<() => void>(() => null);
+  const isPath = useMemo(() => fieldNameOrPath?.endsWith("."), [fieldNameOrPath]);
 
-  const isPath = useMemo(() => fieldNameOrPath.endsWith("."), [fieldNameOrPath]);
-
-  const [value, setValue] = useState<FieldValue>(!isPath ? getValue(fieldNameOrPath) : getValues(fieldNameOrPath));
-
-  const subscribeField = useCallback(
-    (field: HTMLFormField): (() => void) => {
-      const cb = () => {
-        const fieldValue = getFieldValue(field);
-
-        // not using getValue() / getValues() for performance reasons
-        if (isPath) {
-          setValue((old) => {
-            return getValues(fieldNameOrPath); // { ...dotNotationSetValue(old, field[0].name, fieldValue) };
-          });
-        } else {
-          setValue(fieldValue);
-        }
-      };
-
-      // if checkbox or radio, listen to "change" event and retrieve specific value
-      // https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/input_event
-      const eventName = isCheckboxField(field) || isRadioField(field) ? "change" : "input";
-
-      const unsubFuncs = field.map((fieldElement) => {
-        fieldElement.addEventListener(eventName, cb);
-
-        return () => {
-          fieldElement.removeEventListener(eventName, cb);
-
-          /* if (isPath) {
-            setValue(getValues(fieldNameOrPath));
-          } else {
-            setValue(undefined);
-          } */
-        };
-      });
-
-      return () => {
-        unsubFuncs.forEach((f) => f());
-      };
-    },
-    [isPath]
-  );
-
-  const registerPathFieldsEvents: RegisterPathFieldsEvents = useCallback(
-    (fieldsArray) => {
-      const unsubFunctions = fieldsArray.map((field) => subscribeField(field));
-      return () => {
-        unsubFunctions.forEach((f) => f());
-      };
-    },
-    [subscribeField]
-  );
-
-  const registerSingleFieldEvent: RegisterFieldEvent = useCallback(
-    (field: HTMLFormField) => {
-      return subscribeField(field);
-    },
-    [subscribeField]
-  );
-  const observeCallback = useCallback<ObservableObserveCallback<HTMLFormFieldElement[]>>(
-    (newFieldElements) => {
-      const newFields = getFieldsRecordFromFieldElements(
-        newFieldElements.filter((field) =>
-          isPath ? field.name.startsWith(fieldNameOrPath) : field.name === fieldNameOrPath
-        )
+  const setValueFunc = useCallback(() => {
+    if (fieldNameOrPath === undefined) {
+      setValues(flattenIfRequired(form.fieldValues.current, options?.flattenValidationObject));
+    } else if (isPath) {
+      setValues(
+        flattenIfRequired(getNestedValue(form.fieldValues.current, fieldNameOrPath), options?.flattenValidationObject)
       );
-      if (!arrayRecordShallowEqual(newFields, fields.current)) {
-        unsub.current();
-        const newFieldsArray = Object.values(newFields);
-        if (newFieldsArray.length) {
-          unsub.current = isPath ? registerPathFieldsEvents(newFieldsArray) : registerSingleFieldEvent(newFieldsArray[0]);
-        } else {
-          unsub.current = () => null;
-        }
-
-        fields.current = newFields;
-      }
-    },
-    [fieldNameOrPath, isPath, registerPathFieldsEvents, registerSingleFieldEvent]
-  );
-
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      observeCallback(form.fieldElements.current);
-      form.fieldElements.observe(observeCallback);
-      isFirstRender.current = false;
+    } else {
+      setValues(getNestedValue(form.fieldValues.current, fieldNameOrPath));
     }
-  }, [form, form.fieldElements, observeCallback]);
+  }, [fieldNameOrPath, form.fieldValues, isPath, options?.flattenValidationObject]);
 
-  // "as T" is a typescript helper
-  // it is not guaranteed value is actually of type T
-  return value as T;
+  const setErrorsFunc = useCallback(() => {
+    if (fieldNameOrPath === undefined) {
+      setErrors(flattenIfRequired(form._formState.formErrors.current, options?.flattenErrorObject));
+    } else if (isPath) {
+      setErrors(
+        flattenIfRequired(filterRecord(form._formState.formErrors.current, fieldNameOrPath), options?.flattenErrorObject)
+      );
+    } else if (form._formState.formErrors.current[fieldNameOrPath]) {
+      setErrors(form._formState.formErrors.current[fieldNameOrPath]);
+    } else {
+      setErrors(undefined);
+    }
+  }, [fieldNameOrPath, form._formState.formErrors, isPath, options?.flattenErrorObject]);
+
+  useEffect(() => {
+    const unsubFuncs: (() => void)[] = [];
+    // by default watchValue should be subscribed
+    // (watchValue === undefined is the same as watchValue === true)
+    if (watchValues !== false) {
+      setValueFunc();
+      unsubFuncs.push(
+        form.fieldValues.observe(() => {
+          setValueFunc();
+        }, fieldNameOrPath)
+      );
+    }
+
+    if (watchErrors) {
+      unsubFuncs.push(
+        form._formState.formErrors.observe(() => {
+          setErrorsFunc();
+        }, fieldNameOrPath)
+      );
+    }
+
+    return () => {
+      unsubFuncs.forEach((unsub) => unsub());
+    };
+  }, [fieldNameOrPath, form._formState.formErrors, form.fieldValues, setErrorsFunc, setValueFunc, watchErrors, watchValues]);
+
+  return useMemo(() => {
+    return { value: values as any, error: errors as any };
+  }, [errors, values]);
+};
+
+const filterRecord = (record: Record<string, any>, keyFilter: string) => {
+  return Object.keys(record).reduce<FieldGroupErrors>((prev, curr) => {
+    if (curr.startsWith(keyFilter) && curr in record) {
+      prev[curr] = record[curr] || undefined;
+    }
+    return prev;
+  }, {});
 };

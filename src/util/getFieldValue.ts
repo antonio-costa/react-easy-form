@@ -1,29 +1,29 @@
 import { HTMLInputTypeAttribute } from "react";
-import { FieldValuePrimitive, HTMLFormField } from "./useForm";
-import { formNumericalTypes } from "./util";
+import { FieldValuePrimitive, FormNativeField } from "../useForm";
+import { formNumericalTypes } from "./misc";
 
-const isRadioField = (refs: HTMLFormField): boolean => {
+const isRadioField = (refs: FormNativeField): boolean => {
   return refs.every((ref) => ref instanceof HTMLInputElement && ref.type === "radio");
 };
 
-const isCheckboxField = (refs: HTMLFormField): boolean => {
+const isCheckboxField = (refs: FormNativeField): boolean => {
   if (refs.length !== 1) return false;
 
   if (!(refs[0] instanceof HTMLInputElement)) return false;
   return refs[0].type === "checkbox";
 };
 
-const isSelectField = (refs: HTMLFormField): boolean => {
+const isSelectField = (refs: FormNativeField): boolean => {
   if (refs.length !== 1) return false;
 
   return refs[0] instanceof HTMLSelectElement && refs[0].localName === "select";
 };
 
-const isRangeField = (refs: HTMLFormField): boolean => {
+const isRangeField = (refs: FormNativeField): boolean => {
   return refs.every((ref) => ref instanceof HTMLInputElement && ref.type === "range");
 };
 
-const isValidField = (refs: HTMLFormField): boolean => {
+const isValidField = (refs: FormNativeField): boolean => {
   if (!isRadioField(refs) && refs.length > 1) {
     console.warn(
       `Found multiple (non-radio) fields with the same name. This may cause unexpected behaviour (such as values not being set or unintended values being retrived)`
@@ -33,6 +33,7 @@ const isValidField = (refs: HTMLFormField): boolean => {
 
   return true;
 };
+
 const getRadioValue = (refs: HTMLInputElement[]): string => {
   return refs.find((ref) => ref.checked)?.value || "";
 };
@@ -49,22 +50,9 @@ const getSelectValue = (ref: HTMLSelectElement): string | string[] => {
 
 const typifyFieldValue = (value: string, type: HTMLInputTypeAttribute = "text"): FieldValuePrimitive => {
   if (formNumericalTypes.includes(type)) {
-    return value ? Number(value) : undefined;
+    return Number(value);
   }
   return value ?? undefined;
-};
-
-const getFieldValue = (field: HTMLFormField): FieldValuePrimitive => {
-  if (isCheckboxField(field)) {
-    return getCheckboxValue(field[0] as HTMLInputElement);
-  }
-  if (isRadioField(field)) {
-    return getRadioValue(field as HTMLInputElement[]);
-  }
-  if (isSelectField(field)) {
-    return getSelectValue(field[0] as HTMLSelectElement);
-  }
-  return typifyFieldValue(field[0].value, field[0]?.type);
 };
 
 export {
@@ -77,5 +65,4 @@ export {
   getSelectValue,
   typifyFieldValue,
   isValidField,
-  getFieldValue,
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 export type ObservableObserveCallback<T> = (value: T) => void;
 export type ObservableObserve<T> = (cb: ObservableObserveCallback<T>, key?: string) => () => void;
@@ -57,23 +57,13 @@ export const useObservableRef = <T>(initialValue: T): Observable<T> => {
               }
             });
           });
+        } else {
+          Object.keys(keySubscriptions.current).forEach((subscriptionKey) => {
+            keySubscriptions.current[subscriptionKey].forEach((cb) => cb(value.current));
+          });
         }
       },
     };
     return subscribable;
   }, []);
-};
-
-export const useObserve = <T = unknown>(subscribable: Observable<T>) => {
-  const [value, setValue] = useState(subscribable.current);
-  const listener = useCallback((v: T) => setValue(v), []);
-
-  useEffect(() => {
-    const unsub = subscribable.observe(listener);
-    return () => {
-      unsub();
-    };
-  }, [listener, subscribable]);
-
-  return value;
 };

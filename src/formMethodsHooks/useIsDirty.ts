@@ -1,20 +1,20 @@
 import { useCallback } from "react";
-import { GetValue } from "./useGetValue";
+import { FormInternalState } from "../useForm";
+import { getFieldElementName } from "../util/misc";
+import { useGetValue } from "./useGetValue";
 
 export type IsDirty = (fieldNames?: string | string[]) => boolean;
-
-export const useIsDirty = (
-  defaultValues: React.MutableRefObject<Record<string, any>>,
-  getValue: GetValue,
-  fieldElements: React.MutableRefObject<HTMLFormField>
-): IsDirty => {
+export type UseIsDirty = (formState: FormInternalState) => IsDirty;
+export const useIsDirty: UseIsDirty = (formState) => {
+  const getValue = useGetValue(formState);
+  const { fieldElements, defaultValues } = formState;
   return useCallback(
     (fieldNames?: string | string[]): boolean => {
       const fnames = (() => {
         if (fieldNames) {
           return Array.isArray(fieldNames) ? fieldNames : [fieldNames];
         } else {
-          return fieldElements.current.map((field) => field.name);
+          return Object.values(fieldElements()).map((field) => getFieldElementName(field[0]) || "");
         }
       })();
 

@@ -6,24 +6,61 @@
 // - select
 // - textarea
 
-import { useMemo, useRef } from "react";
-import { GetValue, useGetValue } from "./useGetValue";
-import { GetValues, useGetValues } from "./useGetValues";
-import { IsDirty, useIsDirty } from "./useIsDirty";
-import { RegisterField, useRegisterField } from "./useRegisterField";
-import { ExecuteSubmit, RegisterForm, useRegisterForm } from "./useRegisterForm";
-import { useSetValue } from "./useSetValue";
-import { Observable, useObservableRef } from "./useSubscribable/useSubscribable";
+import { useEffect, useMemo, useRef } from "react";
+import {
+  ExecuteSubmit,
+  GetValue,
+  GetValues,
+  IsDirty,
+  RegisterField,
+  RegisterForm,
+  UnregisterField,
+  useErrorMethods,
+  useGetValue,
+  useGetValues,
+  useIsDirty,
+  useRegisterField,
+  useRegisterForm,
+  useSetValue,
+  useUnregisterField,
+} from "./formMethodsHooks";
+import { Observable, useObservableRef } from "./useObservableRef";
 
-export type HTMLFormFieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-export type HTMLFormField = HTMLFormFieldElement[];
-export type HTMLFormFieldRecord = Record<string, HTMLFormField>;
+export type FormNativeFieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+export type FormNativeField = FormNativeFieldElement[];
+export type FormNativeFields = Record<string, FormNativeField>;
+
+export type FormCustomFieldElement<T extends HTMLElement = HTMLElement> = T;
+export type FormCustomField<T extends HTMLElement = HTMLElement> = FormCustomFieldElement<T>[];
+export type FormCustomFields = Record<string, FormCustomField>;
+
+export type FormFieldElement<T extends HTMLElement = HTMLElement> = FormNativeFieldElement | FormCustomFieldElement<T>;
+export type FormField<T extends HTMLElement = HTMLElement> = FormNativeField | FormCustomField<T>;
+export type FormFields<T extends HTMLElement = HTMLElement> = Record<string, FormField<T>>;
+
 export type FieldValuePrimitive = string | string[] | number | number[] | boolean | undefined;
 export type FieldGroupValues = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
 export type FieldValue = FieldValuePrimitive | FieldGroupValues;
 export type FormId = string;
 export type UseForm = typeof useForm;
 export type FormFieldValues = Record<string, FieldValue>;
+
+export type FieldsTouched = string[];
+export type FieldError = string;
+export type FieldGroupErrors = Record<string, FieldError>;
+export type FieldValidator = (fieldValue: FieldValue, formData: FormFieldValues) => string | null;
+export type FormErrors = FieldGroupErrors;
+export type FormValidation = {
+  valid: boolean;
+  errors: FormErrors;
+};
+export type FormValidator = (data: FormFieldValues) => FormValidation;
+
+export type CustomFieldCallbacks = {
+  setValue?: (value: FieldValuePrimitive) => void;
+};
+export type FormCustomFieldCallbacks = Record<string, CustomFieldCallbacks>;
+
 /*
   NOTE:
     In order to unify how to handle all inputs internally, a "field" is defined
@@ -31,56 +68,120 @@ export type FormFieldValues = Record<string, FieldValue>;
 */
 
 export type FormContextValue = {
-  fieldElements: Observable<HTMLFormField>;
-  fieldValues: Observable<Record<string, FieldValue>>;
+  fieldValues: Observable<FormFieldValues>;
   formId: FormId;
   getValue: GetValue;
   getValues: GetValues;
   setValue: (fieldName: string, value: FieldValuePrimitive) => void;
+  setError: any;
+  clearErrors: any;
   register: RegisterField;
+  unregister: UnregisterField;
   registerForm: RegisterForm;
   executeSubmit: ExecuteSubmit;
   isDirty: IsDirty;
+  _formState: FormInternalState;
   /*
   isTouched (low priority)
   ---
-  setError
   getError
-  clearErrors
   ---
   resetField (refreshes defaultValue + removes dirtyness + removes errors)
   resetForm (resets all fields)
   */
 };
+export type FormInternalState = {
+  formId: FormId;
+  nativeFieldElements: Observable<FormNativeFields>;
+  customFieldElements: Observable<FormCustomFields>;
+  customFieldCallbacks: React.MutableRefObject<FormCustomFieldCallbacks>;
+  fieldElements: () => FormFields;
+  fieldValues: Observable<FormFieldValues>;
+  formErrors: Observable<FormErrors>;
+  fieldsTouched: Observable<string[]>;
+  defaultValues: React.MutableRefObject<Record<string, FieldValuePrimitive>>;
+  optionsRef: React.MutableRefObject<UseFormOptions | undefined>;
+};
 export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
-
-const useForm = (formId: string): FormContextValue => {
-  const fieldElements = useObservableRef<HTMLFormFieldElement[]>([]);
-  const defaultValues = useRef<Record<string, any>>({});
+export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
+export type FormValidationObject = {
+  method?: FormValidationMethod;
+  flattenObject?: boolean;
+};
+export type UseFormOptions = {
+  validator?: FormValidator;
+  validation?: FormValidationObject;
+};
+const useForm = (formId: string, options?: UseFormOptions): FormContextValue => {
+  const nativeFieldElements = useObservableRef<FormNativeFields>({});
+  const customFieldElements = useObservableRef<FormCustomFields>({});
+  const customFieldCallbacks = useRef<FormCustomFieldCallbacks>({});
   const fieldValues = useObservableRef<FormFieldValues>({});
+  const formErrors = useObservableRef<FormErrors>({});
+  const fieldsTouched = useObservableRef<FieldsTouched>([]);
+  const defaultValues = useRef<Record<string, FieldValuePrimitive>>({});
+  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
 
-  const { registerForm, executeSubmit } = useRegisterForm(formId);
-  const getValue = useGetValue(formId);
-  const getValues = useGetValues(fieldElements, getValue);
-  const register = useRegisterField({ fieldElements, defaultValues, fieldValues, formId }); // fieldElements & defaultValues are mutated inside this function
-  const setValue = useSetValue({ formId, fieldValues });
-  const isDirty = useIsDirty(defaultValues, getValue, fieldElements);
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
-  return useMemo(
+  const formInternalState = useMemo<FormInternalState>(
     () => ({
+      nativeFieldElements,
+      customFieldElements,
+      customFieldCallbacks,
+      fieldElements: () => ({ ...nativeFieldElements.current, ...customFieldElements.current }),
+      defaultValues,
+      fieldValues,
+      fieldsTouched,
+      formErrors,
+      formId,
+      optionsRef,
+    }),
+    [nativeFieldElements, customFieldElements, fieldValues, fieldsTouched, formErrors, formId]
+  );
+
+  const { registerForm, executeSubmit } = useRegisterForm(formInternalState);
+  const getValue = useGetValue(formInternalState);
+  const getValues = useGetValues(formInternalState);
+  const register = useRegisterField(formInternalState);
+  const unregister = useUnregisterField(formInternalState);
+  const setValue = useSetValue(formInternalState);
+  const isDirty = useIsDirty(formInternalState);
+  const { setError, clearErrors } = useErrorMethods(formInternalState);
+
+  return useMemo(() => {
+    return {
       register,
       registerForm,
       executeSubmit,
       getValue,
       getValues,
-      fieldElements,
+      setError,
+      clearErrors,
       fieldValues,
       formId,
       setValue,
       isDirty,
-    }),
-    [register, registerForm, executeSubmit, getValue, getValues, fieldElements, fieldValues, formId, setValue, isDirty]
-  );
+      unregister,
+      _formState: formInternalState,
+    };
+  }, [
+    register,
+    registerForm,
+    executeSubmit,
+    getValue,
+    getValues,
+    setError,
+    clearErrors,
+    fieldValues,
+    formId,
+    setValue,
+    isDirty,
+    unregister,
+    formInternalState,
+  ]);
 };
 
 export { useForm };

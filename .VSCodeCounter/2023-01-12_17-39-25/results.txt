@@ -1,0 +1,48 @@
+Date : 2023-01-12 17:39:25
+Directory : /home/antonio/Documents/projetos/react-easy-form/src
+Total : 20 files,  1204 codes, 66 comments, 173 blanks, all 1443 lines
+
+Languages
++------------------+------------+------------+------------+------------+------------+
+| language         | files      | code       | comment    | blank      | total      |
++------------------+------------+------------+------------+------------+------------+
+| TypeScript       |         15 |        793 |         32 |        135 |        960 |
+| TypeScript React |          4 |        395 |         34 |         37 |        466 |
+| CSS              |          1 |         16 |          0 |          1 |         17 |
++------------------+------------+------------+------------+------------+------------+
+
+Directories
++-------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                | files      | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                   |         20 |      1,204 |         66 |        173 |      1,443 |
+| . (Files)                                                                           |         19 |      1,129 |         66 |        164 |      1,359 |
+| useObservable                                                                       |          1 |         75 |          0 |          9 |         84 |
++-------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-------------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| filename                                                                            | language         | code       | comment    | blank      | total      |
++-------------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| /home/antonio/Documents/projetos/react-easy-form/src/App.tsx                        | TypeScript React |        233 |         14 |         19 |        266 |
+| /home/antonio/Documents/projetos/react-easy-form/src/FormContext.tsx                | TypeScript React |         32 |          0 |          5 |         37 |
+| /home/antonio/Documents/projetos/react-easy-form/src/getFieldValue.ts               | TypeScript       |         68 |          0 |         14 |         82 |
+| /home/antonio/Documents/projetos/react-easy-form/src/index.css                      | CSS              |         16 |          0 |          1 |         17 |
+| /home/antonio/Documents/projetos/react-easy-form/src/main.tsx                       | TypeScript React |          9 |          0 |          2 |         11 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useErrorMethods.ts             | TypeScript       |         39 |          0 |          8 |         47 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useForm.tsx                    | TypeScript React |        121 |         20 |         11 |        152 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useGetValue.ts                 | TypeScript       |         36 |          0 |          4 |         40 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useGetValues.ts                | TypeScript       |         31 |          0 |          3 |         34 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useIsDirty.ts                  | TypeScript       |         22 |          0 |          3 |         25 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useObservable/useObservable.ts | TypeScript       |         75 |          0 |          9 |         84 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useRegisterField.ts            | TypeScript       |        184 |         16 |         19 |        219 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useRegisterForm.ts             | TypeScript       |         45 |          6 |          9 |         60 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useSetValue.ts                 | TypeScript       |         63 |          0 |         10 |         73 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useUnregisterField.ts          | TypeScript       |         23 |          2 |          2 |         27 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useWatchErrors.ts              | TypeScript       |         36 |          0 |          9 |         45 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useWatchV1.ts                  | TypeScript       |         38 |          2 |         10 |         50 |
+| /home/antonio/Documents/projetos/react-easy-form/src/useWatchV2.ts                  | TypeScript       |         78 |          4 |         12 |         94 |
+| /home/antonio/Documents/projetos/react-easy-form/src/util.ts                        | TypeScript       |         55 |          1 |         22 |         78 |
+| /home/antonio/Documents/projetos/react-easy-form/src/vite-env.d.ts                  | TypeScript       |          0 |          1 |          1 |          2 |
+| Total                                                                               |                  |      1,204 |         66 |        173 |      1,443 |
++-------------------------------------------------------------------------------------+------------------+------------+------------+------------+------------+
