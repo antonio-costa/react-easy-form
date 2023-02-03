@@ -263,7 +263,6 @@ const ErrorDiv = ({ error }: { error: string }) => {
   return error ? <div style={{ color: "red" }}>{error}</div> : null;
 };
 const StressTestInput = memo(({ name }: { name: string }) => {
-  const form = useFormContext();
   const { value, error } = useWatch(`stress.${name}`, { watchValues: true, watchErrors: true });
 
   return (
