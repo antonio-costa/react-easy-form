@@ -16,6 +16,7 @@
 - Include field validators in general form validation function.
 - Add never dirty
 - Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered).
+- Add default values for undefined default values for all input types (`button`, `color`, `date`, `datetime-local`, `email`, `file`, `hidden`, `image`, `month`, `password`, `reset`, `search`, `submit`, `tel`, `time`, `url`, `week`)
 
 ## TODO: Add Unit Testing
 

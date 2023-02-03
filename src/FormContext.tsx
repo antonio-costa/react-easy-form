@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import {
   FieldsTouched,
+  FieldValuePrimitive,
   FormContextValue,
   FormCustomFieldCallbacks,
   FormCustomFields,
@@ -42,7 +43,7 @@ export const FormContext = createContext<FormContextValue>({
     fieldValues: emptyObservable<FormFieldValues>({}),
     fieldsTouched: emptyObservable<FieldsTouched>([]),
     formErrors: emptyObservable<FormErrors>({}),
-    defaultValues: emptyRef<FormFieldValues>({}),
+    defaultValues: emptyRef<Record<string, FieldValuePrimitive>>({}),
     optionsRef: emptyRef<UseFormOptions | undefined>(undefined),
   },
 });

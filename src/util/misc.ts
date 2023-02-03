@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { FormFieldElement, FormNativeFieldElement, FormNativeFields } from "../useForm";
+import { isRadioField } from "./getFieldValue";
 
 export const formSelector = (formId?: string) => `form${formId !== "" && formId ? `#${formId}` : ``}`;
 
@@ -73,8 +74,11 @@ export function dotNotationSetValue(object: any, path: string, value: any) {
   return object;
 }
 
-export const getFieldElementName = (fieldElement: FormFieldElement) => {
-  return "name" in fieldElement ? fieldElement.name : fieldElement?.dataset?.name;
+export const generateFieldName = (name: string, fieldElement: FormFieldElement) => {
+  if (isRadioField([fieldElement])) {
+    return `${name}[[[${(fieldElement as HTMLInputElement).value}]]]`;
+  }
+  return name;
 };
 
 export const flattenObject = (obj: Record<string, any>, prefix = "") => {

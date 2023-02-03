@@ -11,7 +11,8 @@ export const useSetValue = ({
   customFieldCallbacks,
 }: FormInternalState) => {
   const touchField = useCallback(
-    (fieldName: string) => fieldsTouched.setValue((old) => Array.from(new Set([...old, fieldName])), [fieldName]),
+    (fieldName: string) =>
+      fieldsTouched.current.includes(fieldName) ? null : fieldsTouched.setValue((old) => [...old, fieldName], [fieldName]),
     [fieldsTouched]
   );
 
@@ -24,6 +25,13 @@ export const useSetValue = ({
           if (typeof value === "boolean") {
             (fieldEls[0] as HTMLInputElement).checked = value;
             (fieldEls[0] as HTMLInputElement).dispatchEvent(new Event("change"));
+
+            fieldValues.setValue(
+              (old) => {
+                return setNestedValue<FieldValue>(old, fieldName, value);
+              },
+              [fieldName]
+            );
 
             return touchField(fieldName);
           } else {

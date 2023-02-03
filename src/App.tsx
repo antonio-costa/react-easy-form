@@ -97,15 +97,15 @@ function App() {
           <fieldset>
             <div>
               <label htmlFor="male">Male</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "male" })} id="male" />
+              <input type="radio" {...form.register("person.gender")} value="male" defaultChecked id="male" />
             </div>
             <div>
               <label htmlFor="female">Female</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "female" })} defaultChecked id="female" />
+              <input type="radio" {...form.register("person.gender")} value="female" id="female" />
             </div>
             <div>
               <label htmlFor="other">Other</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "other" })} id="other" />
+              <input type="radio" {...form.register("person.gender")} value="other" id="other" />
             </div>
           </fieldset>
           <button
@@ -197,6 +197,7 @@ function App() {
             onClick={() => {
               form.setValue("multiselect-custom", ["wow bro, you set a custom value", "two"]);
               form.setValue("select-cenas", ["strawberry"]);
+              form.setValue("spam", true);
               console.log("form._formState.fieldValues", form._formState.fieldValues.current);
               console.log("form.getValues()", form.getValues());
             }}

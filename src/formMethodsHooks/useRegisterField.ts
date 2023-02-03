@@ -8,13 +8,13 @@ import {
   isValidField,
   typifyFieldValue,
 } from "../util/getFieldValue";
-import { getFieldElementName, getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
+import { getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
 import { useGetValue } from "./useGetValue";
 import { useGetValues } from "./useGetValues";
 
 export type RegisterFieldOptions = {
   defaultSelectOption?: string | string[];
-  radioValue?: string;
+  // radioValue?: string;
   onChange?: React.ChangeEventHandler<FormNativeFieldElement>;
   onBlur?: React.FocusEventHandler<FormNativeFieldElement>;
   validator?: FieldValidator;
@@ -30,39 +30,37 @@ export type RegisterField = (name: string, options?: RegisterFieldOptions) => Re
 
 export type UseRegisterField = (formState: FormInternalState) => RegisterField;
 export const useRegisterField: UseRegisterField = (formState) => {
-  const { nativeFieldElements: fieldElements, defaultValues, fieldValues } = formState;
+  const { nativeFieldElements, defaultValues, fieldValues } = formState;
   const getValue = useGetValue(formState);
   const getValues = useGetValues(formState);
 
   const unregisterRef = useCallback(
-    (name: string, registerOptions?: RegisterFieldOptions) => {
+    (name: string) => {
       // remove element from fieldElements
-      fieldElements.setValue((old) => {
+      nativeFieldElements.setValue((old) => {
         if (old[name]) {
           old[name] = old[name].filter((oldEl) => {
-            const fildElementName = getFieldElementName(oldEl);
-            if (registerOptions?.radioValue === undefined) return fildElementName !== name;
-            return fildElementName !== name || registerOptions.radioValue !== oldEl.value;
+            return oldEl.name !== name;
           });
           if (!old[name].length) delete old[name];
         }
         return old;
       });
     },
-    [fieldElements]
+    [nativeFieldElements]
   );
 
   const registerRef = useCallback(
     (ref: FormNativeFieldElement | null, name: string, registerOptions?: RegisterFieldOptions) => {
       if (!ref) {
-        unregisterRef(name, registerOptions);
+        unregisterRef(name);
         return;
       }
 
-      const field = fieldElements.current[name];
+      const field = nativeFieldElements.current[name];
 
       if (!field) {
-        fieldElements.setValue((old) => {
+        nativeFieldElements.setValue((old) => {
           old[name] = [...(old[name] || []), ref];
           return old;
         });
@@ -120,29 +118,22 @@ export const useRegisterField: UseRegisterField = (formState) => {
             defaultValues.current[name] = registerOptions.defaultSelectOption;
           }
         } else if (isRangeField([ref])) {
-          defaultValues.current[name] = Number((ref as HTMLInputElement).min);
+          const max = Number((ref as HTMLInputElement).max) || 100;
+          const min = Number((ref as HTMLInputElement).min) || 0;
+          defaultValues.current[name] = Math.round((min + max) / 2);
         } else if (isValidField([ref])) {
           const typedRef = ref as Exclude<FormNativeFieldElement, HTMLSelectElement>;
           defaultValues.current[name] = typifyFieldValue(typedRef.defaultValue, typedRef.type);
         }
       }
 
-      // if we are registering a radio button,
-      // make sure that it has a radioValue prop
-      if (isRadioField([ref])) {
-        if (registerOptions?.radioValue === undefined) {
-          throw new Error(
-            "[react-easy-forms] For radio fields, use radioValue inside of form.register() options instead of 'value' prop."
-          );
-        }
-      } else {
-        if (registerOptions?.radioValue !== undefined) {
-          throw new Error("[react-easy-forms] Use radioValue only for radio inputs, it will be ignored otherwise.");
-        }
-      }
-
       // set the default field values
-      if (!formState.fieldsTouched.current.includes(name) && !nestedKeyExists(formState.fieldValues.current, name)) {
+      if (
+        (!formState.fieldsTouched.current.includes(name) && !nestedKeyExists(formState.fieldValues.current, name)) ||
+        (isRadioField([ref]) &&
+          getNestedValue(formState.fieldValues.current, name) === undefined &&
+          formState.defaultValues.current[name] !== undefined)
+      ) {
         formState.fieldValues.setValue(
           (old) => {
             const defaultValueDefined = name in formState.defaultValues.current;
@@ -158,7 +149,7 @@ export const useRegisterField: UseRegisterField = (formState) => {
     },
     [
       defaultValues,
-      fieldElements,
+      nativeFieldElements,
       fieldValues,
       formState.defaultValues,
       formState.fieldValues,
@@ -260,10 +251,6 @@ export const useRegisterField: UseRegisterField = (formState) => {
           onBlur(e, options?.validator);
         },
       };
-
-      if (options?.radioValue) {
-        r.value = options.radioValue;
-      }
 
       return r;
     },
