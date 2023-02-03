@@ -192,7 +192,18 @@ export const useRegisterField: UseRegisterField = (formState) => {
     (e: React.ChangeEvent<FormNativeFieldElement>, fieldValidator?: FieldValidator) => {
       fieldValues.setValue(
         (old) => {
-          return setNestedValue(old, e.currentTarget.name, e.currentTarget.value);
+          const name = e.currentTarget.name;
+          const value = (() => {
+            const field = [e.currentTarget];
+            if (isCheckboxField(field)) {
+              return (e.currentTarget as HTMLInputElement).checked;
+            }
+            if (isRadioField(field) && (field[0] as HTMLInputElement).checked) {
+              return (e.currentTarget as HTMLInputElement).value;
+            }
+            return typifyFieldValue(field[0].value, field[0].type);
+          })();
+          return setNestedValue(old, name, value);
         },
         [e.currentTarget.name]
       );

@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CustomFieldController } from "./CustomFieldController";
 import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
-import { SelectWithForm } from "./customFieldsExamples/reactselect";
 import { FormProvider, useFormContext } from "./FormContext";
 import { FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
 import { useWatch } from "./useWatch";
@@ -204,7 +203,6 @@ function App() {
           >
             debug
           </button>
-          <SelectWithForm name="select-cenas" defaultValue={[{ value: "chocolate", label: "Chocolate" }]} />
           <ErrorDiv error={multiselectError} />
           <StressValues />
           {
