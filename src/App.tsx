@@ -1,23 +1,33 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CustomFieldController } from "./CustomFieldController";
 import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
+import { SelectWithForm } from "./customFieldsExamples/reactselect";
 import { FormProvider, useFormContext } from "./FormContext";
 import { FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
 import { useWatch } from "./useWatch";
 
 const validator1: FormValidator = (data) => {
+  const errors: FormErrors = {};
+
   const validationString = "validated-user";
-  if (typeof data?.person === "object" && !Array.isArray(data.person) && data.person?.username === validationString) {
-    return {
-      valid: true,
-      errors: {},
-    } as FormValidation;
-  } else {
-    return {
-      valid: false,
-      errors: { "person.username": `Username must be equal to '${validationString}'.` },
-    } as FormValidation;
+  if ((data?.person as any)?.username !== validationString) {
+    errors["person.username"] = `Username must be equal to '${validationString}'.`;
   }
+
+  if (
+    !(
+      Array.isArray(data?.["select-cenas"]) &&
+      (data?.["select-cenas"] as string[]).length === 2 &&
+      (data?.["select-cenas"] as string[]).every((v) => ["strawberry", "vanilla"].includes(v))
+    )
+  ) {
+    errors["select-cenas"] = `Select Strawberry and Vanilla.`;
+  }
+
+  return {
+    valid: Boolean(!Object.keys(errors).length),
+    errors,
+  };
 };
 
 const validator2: FormValidator = (data) => {
@@ -25,6 +35,7 @@ const validator2: FormValidator = (data) => {
   Object.keys(data).forEach((fName) => {
     if (fName.startsWith("stress.")) errors[fName] = `Error on ${fName}`;
     if (fName.startsWith("contentEditable-fieldname")) errors[fName] = `Error on ${fName}`;
+    if (fName.startsWith("select-cenas")) errors[fName] = `Error on ${fName}`;
   });
 
   return {
@@ -55,6 +66,14 @@ function App() {
     formContext: form,
   });
 
+  const { error: multiselectError } = useWatch("select-cenas", {
+    watchValues: false,
+    watchErrors: true,
+    formContext: form,
+  });
+  useEffect(() => {
+    console.log("multiselectError", multiselectError);
+  }, [multiselectError]);
   return (
     <div className="App">
       <FormProvider value={form}>
@@ -93,10 +112,12 @@ function App() {
           <button
             type="button"
             onClick={() => {
-              console.log(form.isDirty("description"));
+              console.log("description dirty?", form.isDirty("description"));
+              console.log("select-cenas dirty?", form.isDirty("select-cenas"));
+              console.log("form dirty?", form.isDirty());
             }}
           >
-            is description dirty?
+            is dirty debug?
           </button>
           <button
             type="button"
@@ -166,6 +187,7 @@ function App() {
             </select>
           </fieldset>
           <MultiselectInputWithForm name="multiselect-custom" defaultValue={["test"]} />
+
           <ContentEditableField name="contentEditable-fieldname" defaultValue="def value!" />
           <p>Value: {customFieldValue}</p>
           <ErrorDiv error={customFieldError} />
@@ -175,10 +197,15 @@ function App() {
             type="button"
             onClick={() => {
               form.setValue("multiselect-custom", ["wow bro, you set a custom value", "two"]);
+              form.setValue("select-cenas", ["strawberry"]);
+              console.log("form._formState.fieldValues", form._formState.fieldValues.current);
+              console.log("form.getValues()", form.getValues());
             }}
           >
             debug
           </button>
+          <SelectWithForm name="select-cenas" defaultValue={[{ value: "chocolate", label: "Chocolate" }]} />
+          <ErrorDiv error={multiselectError} />
           <StressValues />
           {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 100px)" }}>
@@ -187,7 +214,6 @@ function App() {
               ))}
             </div>
           }
-          <div accessKey="7" onFocus={() => alert("aa")}></div>
         </form>
       </FormProvider>
     </div>
@@ -285,7 +311,7 @@ const ToggleableTextArea = memo(({ defVal }: { defVal: string }) => {
   const onClick = () => {
     setVisible((old) => {
       if (old) {
-        form.unregister("description");
+        // form.unregister("description");
         return false;
       }
       return true;

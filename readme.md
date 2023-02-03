@@ -6,13 +6,18 @@
 - ~~Add validator support onsubmit, onchange and onblur~~
 - ~~Make decision on how data should be handled (always nested keys or 1 level deep object) - see prop `flattenObject` on useGetValues.~~
   - ~~Decision above for field `values` and field `errors`~~
-- Add support to custom controllers
+- ~~Add support to custom controllers~~
 - Transform all validation functions to accept asynchronous validators
 - Create `resetField()` and `resetForm()` methods.
+- Create `isTouched()` method.
 - ~~Add support for `touched` functionality.~~
 - Create debug tools for `setValue()` (to know from where it was called, if necessary)
 - ~~Change getValue and getValues to retrieve values from \_formState instead of the DOM. (Need to make sure that \_formState is always up to date)~~
 - Include field validators in general form validation function.
+- Add never dirty
+- Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered).
+
+## TODO: Add Unit Testing
 
 ## How to use
 
