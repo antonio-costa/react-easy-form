@@ -9,7 +9,7 @@
 - ~~Add support to custom controllers~~
 - Transform all validation functions to accept asynchronous validators
 - Create `resetField()` and `resetForm()` methods.
-- Create `isTouched()` method.
+- Create `isTouched()` method. **TEST IMPLEMENTATION**
 - ~~Add support for `touched` functionality.~~
 - Create debug tools for `setValue()` (to know from where it was called, if necessary)
 - ~~Change getValue and getValues to retrieve values from \_formState instead of the DOM. (Need to make sure that \_formState is always up to date)~~
