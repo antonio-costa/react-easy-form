@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CustomFieldController } from "./CustomFieldController";
-import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
 import { FormProvider, useFormContext } from "./FormContext";
+import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
 import { FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
 import { useWatch } from "./useWatch";
 

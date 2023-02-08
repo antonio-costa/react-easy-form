@@ -61,7 +61,7 @@ export const usePrevious = (value: any) => {
   return ref.current;
 };
 
-export function dotNotationSetValue(object: any, path: string, value: any) {
+export function dotNotationSetValue(object: any, path: string, value: any): typeof object {
   const way = path.replace(/\[/g, ".").replace(/\]/g, "").split(".");
   const last = way.pop();
 

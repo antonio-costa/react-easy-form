@@ -24,6 +24,7 @@ import {
   useSetValue,
   useUnregisterField,
 } from "./formMethodsHooks";
+import { IsTouched, useIsTouched } from "./formMethodsHooks/useIsTouched";
 import { Observable, useObservableRef } from "./useObservableRef";
 
 export type FormNativeFieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -46,6 +47,7 @@ export type UseForm = typeof useForm;
 export type FormFieldValues = Record<string, FieldValue>;
 
 export type FieldsTouched = string[];
+export type FieldRecordTouched = Record<string, boolean>;
 export type FieldError = string;
 export type FieldGroupErrors = Record<string, FieldError>;
 export type FieldValidator = (fieldValue: FieldValue, formData: FormFieldValues) => string | null;
@@ -80,6 +82,7 @@ export type FormContextValue = {
   registerForm: RegisterForm;
   executeSubmit: ExecuteSubmit;
   isDirty: IsDirty;
+  isTouched: IsTouched;
   _formState: FormInternalState;
   /*
   isTouched (low priority)
@@ -149,6 +152,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const unregister = useUnregisterField(formInternalState);
   const setValue = useSetValue(formInternalState);
   const isDirty = useIsDirty(formInternalState);
+  const isTouched = useIsTouched(formInternalState);
   const { setError, clearErrors } = useErrorMethods(formInternalState);
 
   return useMemo(() => {
@@ -158,6 +162,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       executeSubmit,
       getValue,
       getValues,
+      isTouched,
       setError,
       clearErrors,
       fieldValues,
@@ -173,6 +178,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
     executeSubmit,
     getValue,
     getValues,
+    isTouched,
     setError,
     clearErrors,
     fieldValues,

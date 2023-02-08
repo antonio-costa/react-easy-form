@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import {
-  FieldsTouched,
   FieldValuePrimitive,
+  FieldsTouched,
   FormContextValue,
   FormCustomFieldCallbacks,
   FormCustomFields,
@@ -30,6 +30,7 @@ export const FormContext = createContext<FormContextValue>({
   registerForm: () => ({ id: "", onSubmit: () => null }),
   executeSubmit: () => null,
   isDirty: () => false,
+  isTouched: () => false,
   setValue: () => null,
   unregister: () => null,
   clearErrors: () => null,
