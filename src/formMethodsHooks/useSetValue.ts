@@ -2,19 +2,12 @@ import { useCallback } from "react";
 import { FieldValue, FieldValuePrimitive, FormInternalState } from "../useForm";
 import { isCheckboxField, isRadioField, isValidField } from "../util/getFieldValue";
 import { formNumericalTypes, setNestedValue } from "../util/misc";
+import { useTouchField } from "./useTouchField";
 
-export const useSetValue = ({
-  fieldValues,
-  fieldsTouched,
-  nativeFieldElements,
-  customFieldElements,
-  customFieldCallbacks,
-}: FormInternalState) => {
-  const touchField = useCallback(
-    (fieldName: string) =>
-      fieldsTouched.current.includes(fieldName) ? null : fieldsTouched.setValue((old) => [...old, fieldName], [fieldName]),
-    [fieldsTouched]
-  );
+export const useSetValue = (formState: FormInternalState) => {
+  const { fieldValues, nativeFieldElements, customFieldElements, customFieldCallbacks } = formState;
+
+  const touchField = useTouchField(formState);
 
   return useCallback(
     (fieldName: string, value: FieldValuePrimitive) => {

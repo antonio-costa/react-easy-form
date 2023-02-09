@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useFormContext } from "./FormContext";
 import { useGetValue, useGetValues } from "./formMethodsHooks";
+import { useTouchField } from "./formMethodsHooks/useTouchField";
 import { CustomFieldCallbacks, FieldValidator, FieldValue, FieldValuePrimitive } from "./useForm";
 import { nestedKeyExists, setNestedValue } from "./util/misc";
 
@@ -28,6 +29,7 @@ export const CustomFieldController = ({
   const form = useFormContext();
   const getValue = useGetValue(form._formState);
   const getValues = useGetValues(form._formState);
+  const touchField = useTouchField(form._formState);
 
   const triggerValidation = useCallback(
     (fielName: string, fieldValidator?: FieldValidator) => {
@@ -82,22 +84,26 @@ export const CustomFieldController = ({
       }
 
       triggerValidation(name, fieldValidator);
+      touchField(name);
     },
     [
       fieldValidator,
       form._formState.defaultValues,
       form._formState.fieldValues,
       form._formState.fieldsTouched,
+      touchField,
       triggerValidation,
     ]
   );
 
   const triggerBlur = useCallback<CustomFieldControllerOnBlurHandler>(
     ({ name }) => {
-      if (["onchange", "onblur"].includes(form._formState.optionsRef.current?.validation?.method || ""))
+      if (["onchange", "onblur"].includes(form._formState.optionsRef.current?.validation?.method || "")) {
         triggerValidation(name, fieldValidator);
+      }
+      touchField(name);
     },
-    [fieldValidator, form._formState.optionsRef, triggerValidation]
+    [fieldValidator, form._formState.optionsRef, touchField, triggerValidation]
   );
 
   const handleRef = useCallback(

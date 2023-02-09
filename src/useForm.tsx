@@ -26,6 +26,7 @@ import {
 } from "./formMethodsHooks";
 import { IsTouched, useIsTouched } from "./formMethodsHooks/useIsTouched";
 import { Observable, useObservableRef } from "./useObservableRef";
+import { flattenObject } from "./util/misc";
 
 export type FormNativeFieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 export type FormNativeField = FormNativeFieldElement[];
@@ -46,7 +47,9 @@ export type FormId = string;
 export type UseForm = typeof useForm;
 export type FormFieldValues = Record<string, FieldValue>;
 
+export type FieldsNames = string[];
 export type FieldsTouched = string[];
+export type FieldsNeverDirty = string[];
 export type FieldRecordTouched = Record<string, boolean>;
 export type FieldError = string;
 export type FieldGroupErrors = Record<string, FieldError>;
@@ -56,6 +59,9 @@ export type FormValidation = {
   valid: boolean;
   errors: FormErrors;
 };
+
+// export type FormMapper = (data: FormFieldValues) => FormFieldValues;
+
 export type FormValidator = (data: FormFieldValues) => FormValidation;
 
 export type CustomFieldCallbacks = {
@@ -97,6 +103,7 @@ export type FormInternalState = {
   formId: FormId;
   nativeFieldElements: Observable<FormNativeFields>;
   customFieldElements: Observable<FormCustomFields>;
+  fieldsNames: React.MutableRefObject<FieldsNames>;
   customFieldCallbacks: React.MutableRefObject<FormCustomFieldCallbacks>;
   fieldElements: () => FormFields;
   fieldValues: Observable<FormFieldValues>;
@@ -104,6 +111,7 @@ export type FormInternalState = {
   fieldsTouched: Observable<string[]>;
   defaultValues: React.MutableRefObject<Record<string, FieldValuePrimitive>>;
   optionsRef: React.MutableRefObject<UseFormOptions | undefined>;
+  fieldsNeverDirty: React.MutableRefObject<FieldsNeverDirty>;
 };
 export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
 export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
@@ -114,15 +122,20 @@ export type FormValidationObject = {
 export type UseFormOptions = {
   validator?: FormValidator;
   validation?: FormValidationObject;
+  defaultValues?: FormFieldValues;
+  neverDirty?: FieldsNeverDirty;
+  //  mapper?: FormMapper;
 };
 const useForm = (formId: string, options?: UseFormOptions): FormContextValue => {
   const nativeFieldElements = useObservableRef<FormNativeFields>({});
   const customFieldElements = useObservableRef<FormCustomFields>({});
+  const fieldsNames = useRef<FieldsNames>([]);
   const customFieldCallbacks = useRef<FormCustomFieldCallbacks>({});
   const fieldValues = useObservableRef<FormFieldValues>({});
   const formErrors = useObservableRef<FormErrors>({});
   const fieldsTouched = useObservableRef<FieldsTouched>([]);
-  const defaultValues = useRef<Record<string, FieldValuePrimitive>>({});
+  const fieldsNeverDirty = useRef<FieldsNeverDirty>(options?.neverDirty || []);
+  const defaultValues = useRef<Record<string, FieldValuePrimitive>>(flattenObject(options?.defaultValues || {}));
   const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
 
   useEffect(() => {
@@ -134,6 +147,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       nativeFieldElements,
       customFieldElements,
       customFieldCallbacks,
+      fieldsNames,
       fieldElements: () => ({ ...nativeFieldElements.current, ...customFieldElements.current }),
       defaultValues,
       fieldValues,
@@ -141,6 +155,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       formErrors,
       formId,
       optionsRef,
+      fieldsNeverDirty,
     }),
     [nativeFieldElements, customFieldElements, fieldValues, fieldsTouched, formErrors, formId]
   );

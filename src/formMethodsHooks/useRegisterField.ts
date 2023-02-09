@@ -11,6 +11,7 @@ import {
 import { getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
 import { useGetValue } from "./useGetValue";
 import { useGetValues } from "./useGetValues";
+import { useTouchField } from "./useTouchField";
 
 export type RegisterFieldOptions = {
   defaultSelectOption?: string | string[];
@@ -18,6 +19,7 @@ export type RegisterFieldOptions = {
   onChange?: React.ChangeEventHandler<FormNativeFieldElement>;
   onBlur?: React.FocusEventHandler<FormNativeFieldElement>;
   validator?: FieldValidator;
+  neverDirty?: boolean;
 };
 export type RegisterFieldValue = {
   name: string;
@@ -33,6 +35,7 @@ export const useRegisterField: UseRegisterField = (formState) => {
   const { nativeFieldElements, defaultValues, fieldValues } = formState;
   const getValue = useGetValue(formState);
   const getValues = useGetValues(formState);
+  const touchField = useTouchField(formState);
 
   const unregisterRef = useCallback(
     (name: string) => {
@@ -146,15 +149,30 @@ export const useRegisterField: UseRegisterField = (formState) => {
           [name]
         );
       }
+
+      // add to/remove from never dirty, if required
+      const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+      if (registerOptions?.neverDirty && neverDirtyIndex === -1) {
+        formState.fieldsNeverDirty.current.push(name);
+      } else if (!registerOptions?.neverDirty && neverDirtyIndex !== -1) {
+        formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+      }
+
+      // add to fieldNames, if required
+      if (!formState.fieldsNames.current.includes(name)) {
+        formState.fieldsNames.current.push(name);
+      }
     },
     [
-      defaultValues,
       nativeFieldElements,
-      fieldValues,
-      formState.defaultValues,
-      formState.fieldValues,
-      formState.fieldsTouched,
       getValue,
+      fieldValues,
+      defaultValues,
+      formState.fieldsTouched,
+      formState.fieldValues,
+      formState.defaultValues,
+      formState.fieldsNeverDirty,
+      formState.fieldsNames,
       unregisterRef,
     ]
   );
@@ -204,17 +222,9 @@ export const useRegisterField: UseRegisterField = (formState) => {
       }
 
       // touch field if not already
-      if (formState.fieldsTouched.current.includes(e.currentTarget.name)) {
-        formState.fieldsTouched.setValue(
-          (old) => {
-            old.push(e.currentTarget.name);
-            return old;
-          },
-          [e.currentTarget.name]
-        );
-      }
+      touchField(e.currentTarget.name);
     },
-    [fieldValues, formState.fieldsTouched, formState.optionsRef, triggerValidation]
+    [fieldValues, formState.optionsRef, touchField, triggerValidation]
   );
 
   const onBlur = useCallback(
@@ -224,17 +234,9 @@ export const useRegisterField: UseRegisterField = (formState) => {
       }
 
       // touch field if not already
-      if (formState.fieldsTouched.current.includes(e.currentTarget.name)) {
-        formState.fieldsTouched.setValue(
-          (old) => {
-            old.push(e.currentTarget.name);
-            return old;
-          },
-          [e.currentTarget.name]
-        );
-      }
+      touchField(e.currentTarget.name);
     },
-    [formState.fieldsTouched, formState.optionsRef, triggerValidation]
+    [formState.optionsRef, touchField, triggerValidation]
   );
 
   return useCallback(

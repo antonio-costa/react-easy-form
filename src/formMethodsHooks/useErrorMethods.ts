@@ -17,7 +17,7 @@ export const useErrorMethods: UseFormErrorMethods = (formState) => {
         const r = { ...formState.formErrors.current };
         if (error === null) {
           delete r[fieldName];
-        } else if (formState.fieldElements()[fieldName]) {
+        } else if (formState.fieldsNames.current.includes(fieldName)) {
           r[fieldName] = error;
         }
         return r;
