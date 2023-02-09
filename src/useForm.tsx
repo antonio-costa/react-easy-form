@@ -127,16 +127,17 @@ export type UseFormOptions = {
   //  mapper?: FormMapper;
 };
 const useForm = (formId: string, options?: UseFormOptions): FormContextValue => {
+  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
+  const flattenedDefaultValues = useMemo(() => flattenObject(optionsRef.current?.defaultValues || {}), []);
   const nativeFieldElements = useObservableRef<FormNativeFields>({});
   const customFieldElements = useObservableRef<FormCustomFields>({});
-  const fieldsNames = useRef<FieldsNames>([]);
+  const fieldsNames = useRef<FieldsNames>(Object.keys(flattenedDefaultValues));
   const customFieldCallbacks = useRef<FormCustomFieldCallbacks>({});
-  const fieldValues = useObservableRef<FormFieldValues>({});
+  const fieldValues = useObservableRef<FormFieldValues>(options?.defaultValues || {});
   const formErrors = useObservableRef<FormErrors>({});
   const fieldsTouched = useObservableRef<FieldsTouched>([]);
   const fieldsNeverDirty = useRef<FieldsNeverDirty>(options?.neverDirty || []);
-  const defaultValues = useRef<Record<string, FieldValuePrimitive>>(flattenObject(options?.defaultValues || {}));
-  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
+  const defaultValues = useRef<Record<string, FieldValuePrimitive>>(flattenedDefaultValues);
 
   useEffect(() => {
     optionsRef.current = options;
