@@ -11,6 +11,8 @@ import {
 import { getFieldElementName, getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
 import { useGetValue } from "./useGetValue";
 import { useGetValues } from "./useGetValues";
+import { useTouchField } from "./useTouchField";
+import { useUpdateExternallySet } from "./useUpdateExternallySet";
 
 export type RegisterFieldOptions = {
   defaultSelectOption?: string | string[];
@@ -33,6 +35,8 @@ export const useRegisterField: UseRegisterField = (formState) => {
   const { nativeFieldElements: fieldElements, defaultValues, fieldValues } = formState;
   const getValue = useGetValue(formState);
   const getValues = useGetValues(formState);
+  const touchField = useTouchField(formState);
+  const updateExternallySet = useUpdateExternallySet(formState);
 
   const unregisterRef = useCallback(
     (name: string, registerOptions?: RegisterFieldOptions) => {
@@ -208,6 +212,8 @@ export const useRegisterField: UseRegisterField = (formState) => {
         [e.currentTarget.name]
       );
 
+      updateExternallySet(e.currentTarget.name, false);
+
       if (formState.optionsRef.current?.validation?.method === "onchange") {
         triggerValidation(e.currentTarget.name, fieldValidator);
       }
@@ -223,7 +229,7 @@ export const useRegisterField: UseRegisterField = (formState) => {
         );
       }
     },
-    [fieldValues, formState.fieldsTouched, formState.optionsRef, triggerValidation]
+    [fieldValues, formState.optionsRef, touchField, triggerValidation, updateExternallySet]
   );
 
   const onBlur = useCallback(

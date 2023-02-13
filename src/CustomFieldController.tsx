@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo } from "react";
 import { useFormContext } from "./FormContext";
 import { useGetValue, useGetValues } from "./formMethodsHooks";
+import { useTouchField } from "./formMethodsHooks/useTouchField";
+import { useUpdateExternallySet } from "./formMethodsHooks/useUpdateExternallySet";
 import { CustomFieldCallbacks, FieldValidator, FieldValue, FieldValuePrimitive } from "./useForm";
 import { nestedKeyExists, setNestedValue } from "./util/misc";
 
@@ -28,6 +30,8 @@ export const CustomFieldController = ({
   const form = useFormContext();
   const getValue = useGetValue(form._formState);
   const getValues = useGetValues(form._formState);
+  const touchField = useTouchField(form._formState);
+  const updateExternallySet = useUpdateExternallySet(form._formState);
 
   const triggerValidation = useCallback(
     (fielName: string, fieldValidator?: FieldValidator) => {
@@ -82,13 +86,17 @@ export const CustomFieldController = ({
       }
 
       triggerValidation(name, fieldValidator);
+      touchField(name);
+      updateExternallySet(name, false);
     },
     [
       fieldValidator,
       form._formState.defaultValues,
       form._formState.fieldValues,
       form._formState.fieldsTouched,
+      touchField,
       triggerValidation,
+      updateExternallySet,
     ]
   );
 

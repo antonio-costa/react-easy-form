@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import {
+  FieldsExternallySet,
   FieldsTouched,
   FormContextValue,
   FormCustomFieldCallbacks,
@@ -44,6 +45,7 @@ export const FormContext = createContext<FormContextValue>({
     formErrors: emptyObservable<FormErrors>({}),
     defaultValues: emptyRef<FormFieldValues>({}),
     optionsRef: emptyRef<UseFormOptions | undefined>(undefined),
+    fieldsExternallySet: emptyRef<FieldsExternallySet>([]),
   },
 });
 

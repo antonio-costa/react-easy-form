@@ -22,7 +22,7 @@ import {
   useRegisterField,
   useRegisterForm,
   useSetValue,
-  useUnregisterField,
+  useUnregisterField
 } from "./formMethodsHooks";
 import { Observable, useObservableRef } from "./useObservableRef";
 
@@ -45,6 +45,11 @@ export type FormId = string;
 export type UseForm = typeof useForm;
 export type FormFieldValues = Record<string, FieldValue>;
 
+<<<<<<< Updated upstream
+=======
+export type FieldsNames = string[];
+export type FieldsExternallySet = string[];
+>>>>>>> Stashed changes
 export type FieldsTouched = string[];
 export type FieldError = string;
 export type FieldGroupErrors = Record<string, FieldError>;
@@ -101,6 +106,8 @@ export type FormInternalState = {
   fieldsTouched: Observable<string[]>;
   defaultValues: React.MutableRefObject<Record<string, FieldValuePrimitive>>;
   optionsRef: React.MutableRefObject<UseFormOptions | undefined>;
+  fieldsNeverDirty: React.MutableRefObject<FieldsNeverDirty>;
+  fieldsExternallySet: React.MutableRefObject<FieldsExternallySet>;
 };
 export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
 export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
@@ -119,8 +126,9 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const fieldValues = useObservableRef<FormFieldValues>({});
   const formErrors = useObservableRef<FormErrors>({});
   const fieldsTouched = useObservableRef<FieldsTouched>([]);
-  const defaultValues = useRef<Record<string, FieldValuePrimitive>>({});
-  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
+  const fieldsNeverDirty = useRef<FieldsNeverDirty>(options?.neverDirty || []);
+  const defaultValues = useRef<Record<string, FieldValuePrimitive>>(flattenedDefaultValues);
+  const fieldsExternallySet = useRef<FieldsExternallySet>([]);
 
   useEffect(() => {
     optionsRef.current = options;
@@ -138,6 +146,8 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       formErrors,
       formId,
       optionsRef,
+      fieldsNeverDirty,
+      fieldsExternallySet,
     }),
     [nativeFieldElements, customFieldElements, fieldValues, fieldsTouched, formErrors, formId]
   );
