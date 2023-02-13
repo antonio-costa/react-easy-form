@@ -9,19 +9,18 @@ export type GetValues = (fieldPath?: string, options?: GetValuesOptions) => Fiel
 export type UseGetValues = (formState: FormInternalState) => GetValues;
 export const useGetValues: UseGetValues = (formState): GetValues => {
   const getValue = useGetValue(formState);
-  const { fieldElements } = formState;
+  const { fieldsNames } = formState;
   return useCallback(
     (fieldPath, options) => {
-      const fieldEls = fieldElements();
       if (options?.flattenObject) {
-        Object.keys(fieldEls).reduce<FieldGroupValues>((prev, fieldName) => {
+        fieldsNames.current.reduce<FieldGroupValues>((prev, fieldName) => {
           prev[fieldName] = getValue(fieldName);
           return prev;
         }, {});
       }
 
       // return object separated by dot notation
-      return Object.keys(fieldEls).reduce((prevFormValues: FieldGroupValues, fieldName) => {
+      return fieldsNames.current.reduce((prevFormValues: FieldGroupValues, fieldName) => {
         if (fieldPath && !fieldName.startsWith(fieldPath)) return prevFormValues;
 
         let temp = prevFormValues;
@@ -31,6 +30,6 @@ export const useGetValues: UseGetValues = (formState): GetValues => {
         return prevFormValues;
       }, {} as FieldGroupValues);
     },
-    [fieldElements, getValue]
+    [fieldsNames, getValue]
   );
 };

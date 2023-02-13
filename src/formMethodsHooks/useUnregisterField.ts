@@ -31,7 +31,19 @@ export const useUnregisterField = (formState: FormInternalState): UnregisterFiel
 
       // remove from touched
       fieldsTouched.setValue((old) => old.filter((fname) => fname !== name), [name]);
+
+      // remove from dirty
+      const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+      if (neverDirtyIndex !== -1) {
+        formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+      }
+
+      // remove from field names
+      const fieldNameIndex = formState.fieldsNames.current.findIndex((fname) => fname === name);
+      if (fieldNameIndex !== -1) {
+        formState.fieldsNames.current.splice(fieldNameIndex, 1);
+      }
     },
-    [defaultValues, fieldValues, fieldsTouched, formErrors]
+    [defaultValues, fieldValues, fieldsTouched, formErrors, formState.fieldsNames, formState.fieldsNeverDirty]
   );
 };

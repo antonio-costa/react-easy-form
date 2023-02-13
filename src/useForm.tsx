@@ -22,9 +22,11 @@ import {
   useRegisterField,
   useRegisterForm,
   useSetValue,
-  useUnregisterField
+  useUnregisterField,
 } from "./formMethodsHooks";
+import { IsTouched, useIsTouched } from "./formMethodsHooks/useIsTouched";
 import { Observable, useObservableRef } from "./useObservableRef";
+import { flattenObject } from "./util/misc";
 
 export type FormNativeFieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 export type FormNativeField = FormNativeFieldElement[];
@@ -45,12 +47,11 @@ export type FormId = string;
 export type UseForm = typeof useForm;
 export type FormFieldValues = Record<string, FieldValue>;
 
-<<<<<<< Updated upstream
-=======
 export type FieldsNames = string[];
 export type FieldsExternallySet = string[];
->>>>>>> Stashed changes
 export type FieldsTouched = string[];
+export type FieldsNeverDirty = string[];
+export type FieldRecordTouched = Record<string, boolean>;
 export type FieldError = string;
 export type FieldGroupErrors = Record<string, FieldError>;
 export type FieldValidator = (fieldValue: FieldValue, formData: FormFieldValues) => string | null;
@@ -59,6 +60,9 @@ export type FormValidation = {
   valid: boolean;
   errors: FormErrors;
 };
+
+// export type FormMapper = (data: FormFieldValues) => FormFieldValues;
+
 export type FormValidator = (data: FormFieldValues) => FormValidation;
 
 export type CustomFieldCallbacks = {
@@ -85,6 +89,7 @@ export type FormContextValue = {
   registerForm: RegisterForm;
   executeSubmit: ExecuteSubmit;
   isDirty: IsDirty;
+  isTouched: IsTouched;
   _formState: FormInternalState;
   /*
   isTouched (low priority)
@@ -99,6 +104,7 @@ export type FormInternalState = {
   formId: FormId;
   nativeFieldElements: Observable<FormNativeFields>;
   customFieldElements: Observable<FormCustomFields>;
+  fieldsNames: React.MutableRefObject<FieldsNames>;
   customFieldCallbacks: React.MutableRefObject<FormCustomFieldCallbacks>;
   fieldElements: () => FormFields;
   fieldValues: Observable<FormFieldValues>;
@@ -118,12 +124,18 @@ export type FormValidationObject = {
 export type UseFormOptions = {
   validator?: FormValidator;
   validation?: FormValidationObject;
+  defaultValues?: FormFieldValues;
+  neverDirty?: FieldsNeverDirty;
+  //  mapper?: FormMapper;
 };
 const useForm = (formId: string, options?: UseFormOptions): FormContextValue => {
+  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
+  const flattenedDefaultValues = useMemo(() => flattenObject(optionsRef.current?.defaultValues || {}), []);
   const nativeFieldElements = useObservableRef<FormNativeFields>({});
   const customFieldElements = useObservableRef<FormCustomFields>({});
+  const fieldsNames = useRef<FieldsNames>(Object.keys(flattenedDefaultValues));
   const customFieldCallbacks = useRef<FormCustomFieldCallbacks>({});
-  const fieldValues = useObservableRef<FormFieldValues>({});
+  const fieldValues = useObservableRef<FormFieldValues>(options?.defaultValues || {});
   const formErrors = useObservableRef<FormErrors>({});
   const fieldsTouched = useObservableRef<FieldsTouched>([]);
   const fieldsNeverDirty = useRef<FieldsNeverDirty>(options?.neverDirty || []);
@@ -139,6 +151,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       nativeFieldElements,
       customFieldElements,
       customFieldCallbacks,
+      fieldsNames,
       fieldElements: () => ({ ...nativeFieldElements.current, ...customFieldElements.current }),
       defaultValues,
       fieldValues,
@@ -159,6 +172,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const unregister = useUnregisterField(formInternalState);
   const setValue = useSetValue(formInternalState);
   const isDirty = useIsDirty(formInternalState);
+  const isTouched = useIsTouched(formInternalState);
   const { setError, clearErrors } = useErrorMethods(formInternalState);
 
   return useMemo(() => {
@@ -168,6 +182,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       executeSubmit,
       getValue,
       getValues,
+      isTouched,
       setError,
       clearErrors,
       fieldValues,
@@ -183,6 +198,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
     executeSubmit,
     getValue,
     getValues,
+    isTouched,
     setError,
     clearErrors,
     fieldValues,

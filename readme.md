@@ -8,26 +8,22 @@
   - ~~Decision above for field `values` and field `errors`~~
 - ~~Add support to custom controllers~~
 - Transform all validation functions to accept asynchronous validators
-<<<<<<< Updated upstream
+  <<<<<<< Updated upstream
 - Create `resetField()` and `resetForm()` methods.
-- Create `isTouched()` method.
-=======
 - Create `resetField()`, `resetForm()`, `refreshDefaultValues()` methods.
 - ~~Create `isTouched()` method.~~
->>>>>>> Stashed changes
 - ~~Add support for `touched` functionality.~~
 - Create debug tools for `setValue()` (to know from where it was called, if necessary)
 - ~~Change getValue and getValues to retrieve values from \_formState instead of the DOM. (Need to make sure that \_formState is always up to date)~~
 - Include field validators in general form validation function.
-<<<<<<< Updated upstream
-- Add never dirty
-- Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered).
-=======
 - ~~Add never dirty.~~
 - Add form mapper?
 - Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered). How should `getValues()` handle this?
 - Add default values for undefined default values for all input types (`button`, `color`, `date`, `datetime-local`, `email`, `file`, `hidden`, `image`, `month`, `password`, `reset`, `search`, `submit`, `tel`, `time`, `url`, `week`)
->>>>>>> Stashed changes
+- ~~Add never dirty.~~
+- Add form inputMapper and outputMapper.
+- Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered). How should `getValues()` handle this?
+- Add default values for undefined default values for all input types (`button`, `color`, `date`, `datetime-local`, `email`, `file`, `hidden`, `image`, `month`, `password`, `reset`, `search`, `submit`, `tel`, `time`, `url`, `week`)
 
 ## TODO: Add Unit Testing
 

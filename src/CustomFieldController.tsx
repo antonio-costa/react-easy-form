@@ -102,10 +102,12 @@ export const CustomFieldController = ({
 
   const triggerBlur = useCallback<CustomFieldControllerOnBlurHandler>(
     ({ name }) => {
-      if (["onchange", "onblur"].includes(form._formState.optionsRef.current?.validation?.method || ""))
+      if (["onchange", "onblur"].includes(form._formState.optionsRef.current?.validation?.method || "")) {
         triggerValidation(name, fieldValidator);
+      }
+      touchField(name);
     },
-    [fieldValidator, form._formState.optionsRef, triggerValidation]
+    [fieldValidator, form._formState.optionsRef, touchField, triggerValidation]
   );
 
   const handleRef = useCallback(

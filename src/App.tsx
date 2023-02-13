@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CustomFieldController } from "./CustomFieldController";
 import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
 import { FormProvider, useFormContext } from "./FormContext";
-import { FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
+import { FieldValuePrimitive, FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
 import { useWatch } from "./useWatch";
 
 const validator1: FormValidator = (data) => {
@@ -33,7 +33,7 @@ const validator2: FormValidator = (data) => {
   const errors: FormErrors = {};
   Object.keys(data).forEach((fName) => {
     if (fName.startsWith("stress.")) errors[fName] = `Error on ${fName}`;
-    if (fName.startsWith("contentEditable-fieldname")) errors[fName] = `Error on ${fName}`;
+    if (fName.startsWith("contentEditable-custom")) errors[fName] = `Error on ${fName}`;
     if (fName.startsWith("select-cenas")) errors[fName] = `Error on ${fName}`;
   });
 
@@ -48,6 +48,11 @@ function App() {
   const form = useForm("personal-details", {
     validator,
     validation: { method: "onchange", flattenObject: true },
+    defaultValues: {
+      "items.2222222.components.129391-001": {
+        secondaryId: "oaidakomlwda",
+      },
+    },
   });
 
   const onSubmit = useCallback(
@@ -57,22 +62,30 @@ function App() {
     [form]
   );
 
-  const { value: personValues, error: personErrors } = useWatch("person.", { watchErrors: true, formContext: form });
-  const { value: password, error: passwordError } = useWatch("password", { watchErrors: true, formContext: form });
-
-  const { value: customFieldValue, error: customFieldError } = useWatch("contentEditable-fieldname", {
+  const { value: personValues, error: personErrors } = useWatch<Record<string, FieldValuePrimitive>>("person.", {
     watchErrors: true,
     formContext: form,
   });
+  const { value: password, error: passwordError } = useWatch<string>("password", { watchErrors: true, formContext: form });
 
-  const { error: multiselectError } = useWatch("select-cenas", {
+  const {
+    value: customFieldValue,
+    error: customFieldError,
+    touched: customTouched,
+  } = useWatch<string>("contentEditable-custom", {
+    watchErrors: true,
+    watchTouched: true,
+    formContext: form,
+  });
+
+  const { error: multiselectError } = useWatch<string[]>("select-cenas", {
     watchValues: false,
     watchErrors: true,
     formContext: form,
   });
   useEffect(() => {
-    console.log("multiselectError", multiselectError);
-  }, [multiselectError]);
+    console.log("customTouched", customTouched);
+  }, [customTouched]);
   return (
     <div className="App">
       <FormProvider value={form}>
@@ -97,26 +110,44 @@ function App() {
           <fieldset>
             <div>
               <label htmlFor="male">Male</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "male" })} id="male" />
+              <input type="radio" {...form.register("person.gender")} value="male" defaultChecked id="male" />
             </div>
             <div>
               <label htmlFor="female">Female</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "female" })} defaultChecked id="female" />
+              <input type="radio" {...form.register("person.gender")} value="female" id="female" />
             </div>
             <div>
               <label htmlFor="other">Other</label>
-              <input type="radio" {...form.register("person.gender", { radioValue: "other" })} id="other" />
+              <input type="radio" {...form.register("person.gender")} value="other" id="other" />
             </div>
           </fieldset>
           <button
             type="button"
             onClick={() => {
+              console.log("form state", form._formState);
+            }}
+          >
+            print form state
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               console.log("description dirty?", form.isDirty("description"));
-              console.log("select-cenas dirty?", form.isDirty("select-cenas"));
+              console.log("multiselect-custom dirty?", form.isDirty("multiselect-custom"));
               console.log("form dirty?", form.isDirty());
             }}
           >
             is dirty debug?
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              console.log("description dirty?", form.isTouched("description"));
+              console.log("multiselect-custom dirty?", form.isTouched("multiselect-custom"));
+              console.log("form touched?", form.isTouched());
+            }}
+          >
+            is touched debug?
           </button>
           <button
             type="button"
@@ -187,7 +218,7 @@ function App() {
           </fieldset>
           <MultiselectInputWithForm name="multiselect-custom" defaultValue={["test"]} />
 
-          <ContentEditableField name="contentEditable-fieldname" defaultValue="def value!" />
+          <ContentEditableField name="contentEditable-custom" defaultValue="def value!" />
           <p>Value: {customFieldValue}</p>
           <ErrorDiv error={customFieldError} />
           <button type="submit">Submit form</button>
@@ -197,6 +228,7 @@ function App() {
             onClick={() => {
               form.setValue("multiselect-custom", ["wow bro, you set a custom value", "two"]);
               form.setValue("select-cenas", ["strawberry"]);
+              form.setValue("spam", true);
               console.log("form._formState.fieldValues", form._formState.fieldValues.current);
               console.log("form.getValues()", form.getValues());
             }}
@@ -217,7 +249,6 @@ function App() {
     </div>
   );
 }
-
 const ContentEditableField = ({ name, defaultValue }: { name: string; defaultValue?: string }) => {
   const divRef = useRef<HTMLDivElement | null>();
 
@@ -274,19 +305,6 @@ const StressTestInput = memo(({ name }: { name: string }) => {
   );
 });
 
-/* <fieldset>
-      <label>
-        {`stress.${name}`} {`(${value})`}
-      </label>
-      <input
-        style={{ width: 80 }}
-        {...form.register(`stress.${name}`)}
-        type="text"
-        // defaultValue={!name.includes("-1") ? `def ${name}` : undefined}
-      />
-      {error || ""}
-    </fieldset> */
-
 StressTestInput.displayName = "StressTestInput";
 const StressValues = () => {
   const [visible, setVisible] = useState(true);
@@ -315,7 +333,7 @@ const ToggleableTextArea = memo(({ defVal }: { defVal: string }) => {
     });
   };
 
-  const { value: description } = useWatch("description");
+  const { value: description } = useWatch<string>("description");
 
   return (
     <div>

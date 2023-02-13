@@ -1,28 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "./FormContext";
-import { FieldError, FieldGroupErrors, FieldValue, FormContextValue } from "./useForm";
-import { flattenObject, getNestedValue } from "./util/misc";
+import { FieldError, FieldGroupErrors, FieldRecordTouched, FieldValue, FormContextValue } from "./useForm";
+import { dotNotationSetValue, flattenObject, getNestedValue } from "./util/misc";
 
 export interface UseWatchOptions {
   watchValues?: boolean;
   watchErrors?: boolean;
+  watchTouched?: boolean;
   formContext?: FormContextValue;
   flattenErrorObject?: boolean;
   flattenValidationObject?: boolean;
+  flattenTouchedObject?: boolean;
 }
 
 const flattenIfRequired = (object: Record<string, FieldError | FieldValue>, shouldFlatten?: boolean) => ({
   ...(shouldFlatten ? flattenObject(object) : object),
 });
 
-export const useWatch = (fieldNameOrPath?: string, options?: UseWatchOptions) => {
-  const { watchValues, watchErrors, formContext: customFormCtx } = options || {};
+export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options?: UseWatchOptions) => {
+  const { watchValues, watchErrors, watchTouched, formContext: customFormCtx } = options || {};
 
   const formContext = useFormContext();
   const form = customFormCtx || formContext;
 
   const [values, setValues] = useState<FieldValue>();
   const [errors, setErrors] = useState<FieldGroupErrors | FieldError>();
+  const [touched, setTouched] = useState<FieldRecordTouched | boolean>();
 
   const isPath = useMemo(() => fieldNameOrPath?.endsWith("."), [fieldNameOrPath]);
 
@@ -52,6 +55,30 @@ export const useWatch = (fieldNameOrPath?: string, options?: UseWatchOptions) =>
     }
   }, [fieldNameOrPath, form._formState.formErrors, isPath, options?.flattenErrorObject]);
 
+  const setTouchedFunc = useCallback(() => {
+    const fieldsNames = form._formState.fieldsNames.current;
+    if (fieldNameOrPath !== undefined && fieldsNames.includes(fieldNameOrPath)) {
+      setTouched(form._formState.fieldsTouched.current.includes(fieldNameOrPath));
+    } else if (fieldNameOrPath !== undefined) {
+      // TODO: Optimize this function
+      const fieldsTouchedRecord: FieldRecordTouched = fieldsNames.reduce<FieldRecordTouched>(
+        (prev, currFieldElementName) => {
+          if (!currFieldElementName.startsWith(fieldNameOrPath)) return prev;
+          const touched = form._formState.fieldsTouched.current.includes(currFieldElementName);
+          if (options?.flattenTouchedObject) {
+            prev[currFieldElementName] = touched;
+          }
+          return dotNotationSetValue(prev, currFieldElementName, touched);
+        },
+        {}
+      );
+
+      setTouched(fieldsTouchedRecord);
+    } else {
+      setTouched(undefined);
+    }
+  }, [fieldNameOrPath, form._formState, options?.flattenTouchedObject]);
+
   useEffect(() => {
     const unsubFuncs: (() => void)[] = [];
     // by default watchValue should be subscribed
@@ -73,14 +100,33 @@ export const useWatch = (fieldNameOrPath?: string, options?: UseWatchOptions) =>
       );
     }
 
+    if (watchTouched) {
+      unsubFuncs.push(
+        form._formState.fieldsTouched.observe(() => {
+          setTouchedFunc();
+        }, fieldNameOrPath)
+      );
+    }
+
     return () => {
       unsubFuncs.forEach((unsub) => unsub());
     };
-  }, [fieldNameOrPath, form._formState.formErrors, form.fieldValues, setErrorsFunc, setValueFunc, watchErrors, watchValues]);
+  }, [
+    fieldNameOrPath,
+    form._formState.fieldsTouched,
+    form._formState.formErrors,
+    form.fieldValues,
+    setErrorsFunc,
+    setTouchedFunc,
+    setValueFunc,
+    watchErrors,
+    watchTouched,
+    watchValues,
+  ]);
 
   return useMemo(() => {
-    return { value: values as any, error: errors as any };
-  }, [errors, values]);
+    return { value: values as T, error: errors as any, touched: touched as any };
+  }, [errors, touched, values]);
 };
 
 const filterRecord = (record: Record<string, any>, keyFilter: string) => {
