@@ -13,14 +13,14 @@ export const useGetValues: UseGetValues = (formState): GetValues => {
   return useCallback(
     (fieldPath, options) => {
       if (options?.flattenObject) {
-        fieldsNames.current.reduce<FieldGroupValues>((prev, fieldName) => {
+        fieldsNames().reduce<FieldGroupValues>((prev, fieldName) => {
           prev[fieldName] = getValue(fieldName);
           return prev;
         }, {});
       }
 
       // return object separated by dot notation
-      return fieldsNames.current.reduce((prevFormValues: FieldGroupValues, fieldName) => {
+      return fieldsNames().reduce((prevFormValues: FieldGroupValues, fieldName) => {
         if (fieldPath && !fieldName.startsWith(fieldPath)) return prevFormValues;
 
         let temp = prevFormValues;

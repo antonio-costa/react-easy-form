@@ -6,15 +6,17 @@ export type IsDirty = (fieldNames?: string | string[]) => boolean;
 export type UseIsDirty = (formState: FormInternalState) => IsDirty;
 export const useIsDirty: UseIsDirty = (formState) => {
   const getValue = useGetValue(formState);
-  const { fieldsNames, defaultValues, fieldsNeverDirty } = formState;
+  const { fieldsNames, defaultValues, fieldsNeverDirty, optionsRef } = formState;
   return useCallback(
     (fieldNames?: string | string[]): boolean => {
-      const fnames = fieldNames ? (Array.isArray(fieldNames) ? fieldNames : [fieldNames]) : fieldsNames.current;
+      const fnames = fieldNames ? (Array.isArray(fieldNames) ? fieldNames : [fieldNames]) : fieldsNames();
+      const allDefaultOptions = { ...defaultValues.current, ...(optionsRef.current?.defaultValues || {}) };
 
-      return fnames.some(
-        (fname) => getValue(fname) !== defaultValues.current[fname] && !fieldsNeverDirty.current.includes(fname)
+      const dirtyField = fnames.find(
+        (fname) => getValue(fname) !== allDefaultOptions[fname] && !fieldsNeverDirty.current.includes(fname)
       );
+      return dirtyField !== undefined;
     },
-    [fieldsNames, getValue, defaultValues, fieldsNeverDirty]
+    [fieldsNames, optionsRef, defaultValues, getValue, fieldsNeverDirty]
   );
 };

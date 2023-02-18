@@ -3,7 +3,7 @@ import { CustomFieldController } from "./CustomFieldController";
 import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
 import { FormProvider, useFormContext } from "./FormContext";
 import { FieldValuePrimitive, FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
-import { useWatch } from "./useWatch";
+import { useWatch } from "./watchers/useWatch";
 
 const validator1: FormValidator = (data) => {
   const errors: FormErrors = {};
@@ -52,6 +52,9 @@ function App() {
       "items.2222222.components.129391-001": {
         secondaryId: "oaidakomlwda",
       },
+      "person.username": "other111",
+      "person.gender": "other",
+      description: "default from use form",
     },
   });
 
@@ -227,7 +230,7 @@ function App() {
             type="button"
             onClick={() => {
               form.setValue("multiselect-custom", ["wow bro, you set a custom value", "two"]);
-              form.setValue("select-cenas", ["strawberry"]);
+              form.setValue("select-cenas", ["strawberry", "vanilla"]);
               form.setValue("spam", true);
               console.log("form._formState.fieldValues", form._formState.fieldValues.current);
               console.log("form.getValues()", form.getValues());

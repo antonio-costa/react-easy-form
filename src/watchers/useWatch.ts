@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useFormContext } from "./FormContext";
-import { FieldError, FieldGroupErrors, FieldRecordTouched, FieldValue, FormContextValue } from "./useForm";
-import { dotNotationSetValue, flattenObject, getNestedValue } from "./util/misc";
+import { useFormContext } from "../FormContext";
+import { FieldError, FieldGroupErrors, FieldRecordTouched, FieldValue, FormContextValue } from "../useForm";
+import { dotNotationSetValue, flattenObject, getNestedValue } from "../util/misc";
 
 export interface UseWatchOptions {
   watchValues?: boolean;
@@ -56,7 +56,7 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
   }, [fieldNameOrPath, form._formState.formErrors, isPath, options?.flattenErrorObject]);
 
   const setTouchedFunc = useCallback(() => {
-    const fieldsNames = form._formState.fieldsNames.current;
+    const fieldsNames = form._formState.fieldsNames();
     if (fieldNameOrPath !== undefined && fieldsNames.includes(fieldNameOrPath)) {
       setTouched(form._formState.fieldsTouched.current.includes(fieldNameOrPath));
     } else if (fieldNameOrPath !== undefined) {

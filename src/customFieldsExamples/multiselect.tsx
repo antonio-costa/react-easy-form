@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { CustomFieldController } from "../CustomFieldController";
+import { RegisterFieldValue } from "../formMethodsHooks";
 
 interface MultiselectInputProps {
   defaultValue?: string[];
@@ -34,14 +35,10 @@ export const MultiselectInput = forwardRef<HTMLDivElement & { value: string[] },
             {v}
             <span
               onClick={() => {
-                setValues((old) => {
-                  const newValues = old.filter((o) => o !== v);
-
-                  if (newValues.length === old.length) return old;
-
-                  onChange && onChange(newValues);
-                  return newValues;
-                });
+                const newValues = values.filter((o) => o !== v);
+                if (newValues.length === values.length) return;
+                onChange && onChange(newValues);
+                setValues(newValues);
               }}
             >
               [DEL]
@@ -59,15 +56,13 @@ export const MultiselectInput = forwardRef<HTMLDivElement & { value: string[] },
         <button
           type="button"
           onClick={() => {
-            setValues((old) => {
-              if (!ref.current) return old;
+            if (!ref.current) return;
 
-              const newValues = Array.from(new Set([...old, ref.current.value]));
-              if (newValues.length === old.length) return old;
+            const newValues = Array.from(new Set([...values, ref.current.value]));
+            if (newValues.length === values.length) return;
 
-              onChange && onChange(newValues);
-              return newValues;
-            });
+            onChange && onChange(newValues);
+            setValues(newValues);
           }}
         >
           add value
@@ -79,24 +74,36 @@ export const MultiselectInput = forwardRef<HTMLDivElement & { value: string[] },
 
 MultiselectInput.displayName = "MultiselectInput";
 
-export const MultiselectInputWithForm = ({ defaultValue, name }: MultiselectInputProps & { name: string }) => {
-  const [triggerValue, setTriggerValue] = useState<string[]>(defaultValue || []);
+export interface MultiselectInputWithFormProps extends Partial<RegisterFieldValue<HTMLDivElement & { value: string[] }>> {
+  defaultValue?: string[];
+  onChangeOverride?: (value: string[]) => void;
+  name: string;
+}
 
-  return (
-    <CustomFieldController
-      name={name}
-      defaultValue={defaultValue}
-      onSetValue={(value) => setTriggerValue(value as string[])}
-    >
-      {({ ref, triggerBlur, triggerChange }) => (
-        <MultiselectInput
-          onBlur={() => triggerBlur({ name })}
-          onChange={(value) => triggerChange({ name, value })}
-          ref={ref}
-          defaultValue={defaultValue}
-          value={triggerValue}
-        />
-      )}
-    </CustomFieldController>
-  );
-};
+export const MultiselectInputWithForm = forwardRef(
+  ({ defaultValue, name, onChangeOverride }: MultiselectInputWithFormProps, _) => {
+    const [triggerValue, setTriggerValue] = useState<string[]>(defaultValue || []);
+    return (
+      <CustomFieldController
+        name={name}
+        defaultValue={defaultValue}
+        onSetValue={(value) => setTriggerValue(value as string[])}
+      >
+        {({ ref, triggerBlur, triggerChange, defaultValue: _defaultValue }) => (
+          <MultiselectInput
+            onBlur={() => triggerBlur({ name })}
+            onChange={(value) => {
+              triggerChange({ name, value });
+              onChangeOverride && onChangeOverride(value);
+            }}
+            ref={ref}
+            defaultValue={_defaultValue as string[] | undefined}
+            value={triggerValue}
+          />
+        )}
+      </CustomFieldController>
+    );
+  }
+);
+
+MultiselectInputWithForm.displayName = "MultiselectInputWithForm";

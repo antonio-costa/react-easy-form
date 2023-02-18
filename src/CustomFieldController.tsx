@@ -13,12 +13,13 @@ export interface CustomFieldControllerProps {
   children: (fieldProps: {
     triggerChange: CustomFieldControllerOnChangeHandler;
     triggerBlur: CustomFieldControllerOnBlurHandler;
-    ref: (ref: any) => void;
+    ref: any;
+    defaultValue: FieldValuePrimitive;
   }) => React.ReactNode;
-  name: string;
   defaultValue?: FieldValuePrimitive;
   fieldValidator?: FieldValidator;
   onSetValue?: CustomFieldCallbacks["setValue"];
+  name: string;
 }
 export const CustomFieldController = ({
   children,
@@ -60,29 +61,27 @@ export const CustomFieldController = ({
 
   const triggerChange = useCallback<CustomFieldControllerOnChangeHandler>(
     ({ name, value }) => {
-      form._formState.fieldValues.setValue(
-        (old) => {
-          return setNestedValue(old, name, value);
-        },
-        [name]
-      );
+      const nestedValue = setNestedValue(form._formState.fieldValues.current, name, value);
+
+      form._formState.fieldValues.setValue(() => {
+        return nestedValue;
+      }, [name]);
 
       // set the field value
       if (
         !form._formState.fieldsTouched.current.includes(name) &&
         !nestedKeyExists(form._formState.fieldValues.current, name)
       ) {
-        form._formState.fieldValues.setValue(
-          (old) => {
-            const defaultValueDefined = name in form._formState.defaultValues.current;
-            return setNestedValue<FieldValue>(
-              old,
-              name,
-              defaultValueDefined ? form._formState.defaultValues.current[name] : undefined
-            );
-          },
-          [name]
+        const defaultValueDefined = name in form._formState.defaultValues.current;
+        const nestedValue = setNestedValue<FieldValue>(
+          form._formState.fieldValues.current,
+          name,
+          defaultValueDefined ? form._formState.defaultValues.current[name] : undefined
         );
+
+        form._formState.fieldValues.setValue(() => {
+          return nestedValue;
+        }, [name]);
       }
 
       triggerValidation(name, fieldValidator);
@@ -161,8 +160,13 @@ export const CustomFieldController = ({
   );
 
   const childreMemoed = useMemo(() => {
-    return children({ triggerChange, triggerBlur, ref: handleRef });
-  }, [children, handleRef, triggerBlur, triggerChange]);
+    return children({
+      triggerChange,
+      triggerBlur,
+      ref: handleRef,
+      defaultValue: form._formState.optionsRef.current?.flattenedDefaultValues?.[name],
+    });
+  }, [children, form._formState.optionsRef, handleRef, name, triggerBlur, triggerChange]);
 
   return <>{childreMemoed}</>;
 };

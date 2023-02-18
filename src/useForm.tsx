@@ -13,6 +13,7 @@ import {
   GetValues,
   IsDirty,
   RegisterField,
+  RegisterFieldOptions,
   RegisterForm,
   UnregisterField,
   useErrorMethods,
@@ -51,6 +52,7 @@ export type FieldsNames = string[];
 export type FieldsExternallySet = string[];
 export type FieldsTouched = string[];
 export type FieldsNeverDirty = string[];
+export type FieldsRegisterOptions = Record<string, RegisterFieldOptions>;
 export type FieldRecordTouched = Record<string, boolean>;
 export type FieldError = string;
 export type FieldGroupErrors = Record<string, FieldError>;
@@ -104,16 +106,17 @@ export type FormInternalState = {
   formId: FormId;
   nativeFieldElements: Observable<FormNativeFields>;
   customFieldElements: Observable<FormCustomFields>;
-  fieldsNames: React.MutableRefObject<FieldsNames>;
   customFieldCallbacks: React.MutableRefObject<FormCustomFieldCallbacks>;
+  fieldsNames: () => FieldsNames;
   fieldElements: () => FormFields;
   fieldValues: Observable<FormFieldValues>;
   formErrors: Observable<FormErrors>;
   fieldsTouched: Observable<string[]>;
   defaultValues: React.MutableRefObject<Record<string, FieldValuePrimitive>>;
-  optionsRef: React.MutableRefObject<UseFormOptions | undefined>;
+  optionsRef: React.MutableRefObject<UseFormOptionsRef>;
   fieldsNeverDirty: React.MutableRefObject<FieldsNeverDirty>;
   fieldsExternallySet: React.MutableRefObject<FieldsExternallySet>;
+  fieldsRegisterOptions: React.MutableRefObject<FieldsRegisterOptions>;
 };
 export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
 export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
@@ -124,26 +127,35 @@ export type FormValidationObject = {
 export type UseFormOptions = {
   validator?: FormValidator;
   validation?: FormValidationObject;
-  defaultValues?: FormFieldValues;
+  defaultValues?: FieldGroupValues;
   neverDirty?: FieldsNeverDirty;
-  //  mapper?: FormMapper;
 };
+export type UseFormOptionsRef = UseFormOptions & {
+  flattenedDefaultValues?: Record<string, FieldValuePrimitive>;
+};
+
+const generateUseFormOptionsRef = (options?: UseFormOptions): UseFormOptionsRef => ({
+  defaultValues: options?.defaultValues || {},
+  neverDirty: [],
+  flattenedDefaultValues: flattenObject(options?.defaultValues || {}),
+  ...options,
+});
+
 const useForm = (formId: string, options?: UseFormOptions): FormContextValue => {
-  const optionsRef = useRef<UseFormOptions | undefined>(options); // avoid re-renders when changing options
-  const flattenedDefaultValues = useMemo(() => flattenObject(optionsRef.current?.defaultValues || {}), []);
+  const optionsRef = useRef<UseFormOptionsRef>(generateUseFormOptionsRef(options)); // avoid re-renders when changing options
   const nativeFieldElements = useObservableRef<FormNativeFields>({});
   const customFieldElements = useObservableRef<FormCustomFields>({});
-  const fieldsNames = useRef<FieldsNames>(Object.keys(flattenedDefaultValues));
   const customFieldCallbacks = useRef<FormCustomFieldCallbacks>({});
-  const fieldValues = useObservableRef<FormFieldValues>(options?.defaultValues || {});
+  const fieldValues = useObservableRef<FormFieldValues>({ ...(options?.defaultValues || {}) });
   const formErrors = useObservableRef<FormErrors>({});
   const fieldsTouched = useObservableRef<FieldsTouched>([]);
   const fieldsNeverDirty = useRef<FieldsNeverDirty>(options?.neverDirty || []);
-  const defaultValues = useRef<Record<string, FieldValuePrimitive>>(flattenedDefaultValues);
+  const defaultValues = useRef<Record<string, FieldValuePrimitive>>({});
   const fieldsExternallySet = useRef<FieldsExternallySet>([]);
+  const fieldOptions = useRef<FieldsRegisterOptions>({});
 
   useEffect(() => {
-    optionsRef.current = options;
+    optionsRef.current = generateUseFormOptionsRef(options);
   }, [options]);
 
   const formInternalState = useMemo<FormInternalState>(
@@ -151,7 +163,15 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       nativeFieldElements,
       customFieldElements,
       customFieldCallbacks,
-      fieldsNames,
+      fieldsNames: () =>
+        Array.from(
+          new Set([
+            ...Object.keys(nativeFieldElements.current),
+            ...Object.keys(customFieldElements.current),
+            ...Object.keys(defaultValues.current),
+            ...Object.keys(optionsRef.current.flattenedDefaultValues || {}),
+          ])
+        ),
       fieldElements: () => ({ ...nativeFieldElements.current, ...customFieldElements.current }),
       defaultValues,
       fieldValues,
@@ -161,6 +181,7 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       optionsRef,
       fieldsNeverDirty,
       fieldsExternallySet,
+      fieldsRegisterOptions: fieldOptions,
     }),
     [nativeFieldElements, customFieldElements, fieldValues, fieldsTouched, formErrors, formId]
   );

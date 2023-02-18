@@ -1,5 +1,5 @@
 import { HTMLInputTypeAttribute } from "react";
-import { FieldValuePrimitive, FormField } from "../useForm";
+import { FieldValuePrimitive, FormField, FormNativeFieldElement } from "../useForm";
 import { formNumericalTypes } from "./misc";
 
 const isRadioField = (refs: FormField): boolean => {
@@ -34,7 +34,17 @@ const isValidField = (refs: FormField): boolean => {
   return true;
 };
 
-const getRadioValue = (refs: HTMLInputElement[]): string => {
+const getRadioValue = (refs: HTMLInputElement[], findInDOM?: boolean): string | undefined => {
+  if (findInDOM && refs.length > 0) {
+    const formElement = refs[0].closest("form");
+
+    if (!formElement) {
+      throw new Error("[react-easy-form] Please wrap all inputs in a <form /> element.");
+    }
+
+    const formData = new FormData(formElement);
+    return (formData.get(refs[0].name) as string | undefined) ?? undefined;
+  }
   return refs.find((ref) => ref.checked)?.value || "";
 };
 
@@ -55,6 +65,19 @@ const typifyFieldValue = (value: string, type: HTMLInputTypeAttribute = "text"):
   return value ?? undefined;
 };
 
+const getFieldValue = (refs: FormField) => {
+  if (isRadioField(refs)) return getRadioValue(refs as HTMLInputElement[], true);
+  if (isCheckboxField(refs)) return getCheckboxValue(refs[0] as HTMLInputElement);
+  if (isSelectField(refs)) return getSelectValue(refs[0] as HTMLSelectElement);
+  if (isValidField(refs))
+    return typifyFieldValue(
+      (refs[0] as Exclude<FormNativeFieldElement, HTMLSelectElement>).value,
+      (refs[0] as Exclude<FormNativeFieldElement, HTMLSelectElement>).type
+    );
+
+  throw new Error("[react-easy-form] Invalid input reference.");
+};
+
 export {
   isRadioField,
   isCheckboxField,
@@ -65,4 +88,5 @@ export {
   getSelectValue,
   typifyFieldValue,
   isValidField,
+  getFieldValue,
 };

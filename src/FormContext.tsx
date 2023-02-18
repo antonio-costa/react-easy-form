@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import {
   FieldsExternallySet,
   FieldsNeverDirty,
+  FieldsRegisterOptions,
   FieldsTouched,
   FieldValuePrimitive,
   FormContextValue,
@@ -43,7 +44,7 @@ export const FormContext = createContext<FormContextValue>({
     customFieldElements: emptyObservable<FormCustomFields>({}),
     customFieldCallbacks: emptyRef<FormCustomFieldCallbacks>({}),
     fieldElements: () => ({}),
-    fieldsNames: emptyRef([]),
+    fieldsNames: () => [],
     fieldValues: emptyObservable<FormFieldValues>({}),
     fieldsTouched: emptyObservable<FieldsTouched>([]),
     fieldsNeverDirty: emptyRef<FieldsNeverDirty>([]),
@@ -51,6 +52,7 @@ export const FormContext = createContext<FormContextValue>({
     defaultValues: emptyRef<Record<string, FieldValuePrimitive>>({}),
     optionsRef: emptyRef<UseFormOptions | undefined>(undefined),
     fieldsExternallySet: emptyRef<FieldsExternallySet>([]),
+    fieldsRegisterOptions: emptyRef<FieldsRegisterOptions>({}),
   },
 });
 

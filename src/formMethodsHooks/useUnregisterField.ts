@@ -37,13 +37,7 @@ export const useUnregisterField = (formState: FormInternalState): UnregisterFiel
       if (neverDirtyIndex !== -1) {
         formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
       }
-
-      // remove from field names
-      const fieldNameIndex = formState.fieldsNames.current.findIndex((fname) => fname === name);
-      if (fieldNameIndex !== -1) {
-        formState.fieldsNames.current.splice(fieldNameIndex, 1);
-      }
     },
-    [defaultValues, fieldValues, fieldsTouched, formErrors, formState.fieldsNames, formState.fieldsNeverDirty]
+    [defaultValues, fieldValues, fieldsTouched, formErrors, formState.fieldsNeverDirty]
   );
 };
