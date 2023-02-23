@@ -35,24 +35,24 @@ export const CustomFieldController = ({
   const updateExternallySet = useUpdateExternallySet(form._formState);
 
   const triggerValidation = useCallback(
-    (fielName: string, fieldValidator?: FieldValidator) => {
+    (fieldName: string, fieldValidator?: FieldValidator) => {
       // field validator
-      const fieldErrorMessage = fieldValidator && fieldValidator(getValue(fielName), getValues());
+      const fieldErrorMessage = fieldValidator && fieldValidator(getValue(fieldName), getValues());
       if (fieldErrorMessage) {
         return form._formState.formErrors.setValue(
-          { ...form._formState.formErrors.current, [fielName]: fieldErrorMessage },
-          [fielName]
+          { ...form._formState.formErrors.current, [fieldName]: fieldErrorMessage },
+          [fieldName]
         );
       }
 
       // form validator
       if (!form._formState?.optionsRef?.current?.validator) return;
-      const validation = form._formState?.optionsRef.current.validator(getValues(fielName));
+      const validation = form._formState?.optionsRef.current.validator(getValues(fieldName));
 
-      if (form._formState.formErrors.current[fielName] !== validation.errors[fielName]) {
+      if (form._formState.formErrors.current[fieldName] !== validation.errors[fieldName]) {
         form._formState.formErrors.setValue(
-          { ...form._formState.formErrors.current, [fielName]: validation.errors[fielName] },
-          [fielName]
+          { ...form._formState.formErrors.current, [fieldName]: validation.errors[fieldName] },
+          [fieldName]
         );
       }
     },
@@ -67,7 +67,7 @@ export const CustomFieldController = ({
         return nestedValue;
       }, [name]);
 
-      // set the field value
+      // set the field value (default values)
       if (
         !form._formState.fieldsTouched.current.includes(name) &&
         !nestedKeyExists(form._formState.fieldValues.current, name)
@@ -128,7 +128,12 @@ export const CustomFieldController = ({
 
         form._formState.customFieldCallbacks.current[name] = {
           ...(form._formState.customFieldCallbacks.current[name] || {}),
-          setValue: onSetValue,
+          setValue: (value) => {
+            triggerValidation(name, fieldValidator);
+            touchField(name);
+            updateExternallySet(name, false);
+            onSetValue && onSetValue(value);
+          },
         };
 
         // set the default value
@@ -156,7 +161,7 @@ export const CustomFieldController = ({
 
       form;
     },
-    [defaultValue, form, name, onSetValue]
+    [defaultValue, fieldValidator, form, name, onSetValue, touchField, triggerValidation, updateExternallySet]
   );
 
   const childreMemoed = useMemo(() => {

@@ -12,5 +12,5 @@ export const useWatchError = (fieldNameOrPath: string, options?: WatchErrorOptio
     watchValues: false,
     flattenErrorObject: options?.flatten,
     formContext: options?.formContext,
-  }).value;
+  }).error;
 };

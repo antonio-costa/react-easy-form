@@ -12,5 +12,5 @@ export const useWatchTouched = <T extends FieldValue>(fieldNameOrPath?: string, 
     watchValues: false,
     flattenTouchedObject: options?.flatten,
     formContext: options?.formContext,
-  }).value;
+  }).touched;
 };
