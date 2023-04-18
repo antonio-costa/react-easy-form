@@ -1,23 +1,31 @@
 import { useCallback } from "react";
 import { FieldValue, FieldValuePrimitive, FormInternalState } from "../useForm";
 import { isCheckboxField, isRadioField, isSelectField, isValidField } from "../util/getFieldValue";
-import { formNumericalTypes, setNestedValue } from "../util/misc";
+import { setNestedValue } from "../util/misc";
 import { useTouchField } from "./useTouchField";
+import { useTriggerValidation } from "./useTriggerValidation";
 import { useUpdateExternallySet } from "./useUpdateExternallySet";
 
-export type SetValue = (fieldName: string, value: FieldValuePrimitive) => void;
+export type SetValue = (fieldName: string, value: FieldValuePrimitive, triggerValidation?: boolean) => void;
 export type UseSetValue = (formState: FormInternalState) => SetValue;
 
 export const useSetValue: UseSetValue = (formState) => {
-  const { fieldValues, nativeFieldElements, customFieldElements, customFieldCallbacks } = formState;
+  const { fieldValues, nativeFieldElements, customFieldElements, customFieldCallbacks, optionsRef, fieldsDOMSyncing } =
+    formState;
 
   const touchField = useTouchField(formState);
   const updateExternallySet = useUpdateExternallySet(formState);
+  const triggerValidationFn = useTriggerValidation(formState);
 
   return useCallback(
-    (fieldName: string, value: FieldValuePrimitive) => {
-      const fieldEls = nativeFieldElements.current?.[fieldName] || [];
+    (fieldName: string, value: FieldValuePrimitive, triggerValidation = true) => {
+      fieldsDOMSyncing.current.delete(fieldName);
+      if (optionsRef.current.debug?.logSetValue?.includes(fieldName)) {
+        console.log("[FORMS-DEBUG] [logSetValue] Tracing: ", fieldName);
+        console.trace(fieldName);
+      }
 
+      const fieldEls = nativeFieldElements.current?.[fieldName] || [];
       if (fieldEls.length) {
         if (isCheckboxField(fieldEls)) {
           if (typeof value === "boolean") {
@@ -32,6 +40,11 @@ export const useSetValue: UseSetValue = (formState) => {
             );
             updateExternallySet(fieldName, true);
             touchField(fieldName);
+
+            if (triggerValidation) {
+              triggerValidationFn(fieldName);
+            }
+
             return;
           } else {
             throw new Error(`Checkbox [${fieldName}] expected boolean but got ${value} (${typeof value})`);
@@ -54,7 +67,9 @@ export const useSetValue: UseSetValue = (formState) => {
 
               updateExternallySet(fieldName, true);
               touchField(fieldName);
-              return;
+              if (triggerValidation) {
+                triggerValidationFn(fieldName);
+              }
             });
           } else {
             throw new Error(`Radio [${fieldName}] expected string or undefined but got ${value} (${typeof value})`);
@@ -76,9 +91,9 @@ export const useSetValue: UseSetValue = (formState) => {
 
           fieldValues.setValue(
             (old) => {
-              return setNestedValue(old, fieldEls[0].name, value);
+              return setNestedValue(old, fieldName, value);
             },
-            [fieldEls[0].name]
+            [fieldName]
           );
 
           const fValue = typeof value === "number" ? String(value) : (value as string);
@@ -88,18 +103,15 @@ export const useSetValue: UseSetValue = (formState) => {
 
           updateExternallySet(fieldName, true);
           touchField(fieldName);
-        } else if (isValidField(fieldEls)) {
-          const expectedType = formNumericalTypes.includes(fieldEls[0].type) ? "number" : "string";
-
-          if (typeof value !== expectedType) {
-            throw new Error(`Input [${fieldName}] expected ${expectedType} but got ${value} (${typeof value})`);
+          if (triggerValidation) {
+            triggerValidationFn(fieldName);
           }
-
+        } else if (isValidField(fieldEls)) {
           fieldValues.setValue(
             (old) => {
-              return setNestedValue(old, fieldEls[0].name, value);
+              return setNestedValue(old, fieldName, value);
             },
-            [fieldEls[0].name]
+            [fieldName]
           );
 
           const fValue = typeof value === "number" ? String(value) : (value as string);
@@ -109,6 +121,9 @@ export const useSetValue: UseSetValue = (formState) => {
 
           updateExternallySet(fieldName, true);
           touchField(fieldName);
+          if (triggerValidation) {
+            triggerValidationFn(fieldName);
+          }
           return;
         } else {
           throw new Error(`Could not set value for ${fieldName}.`);
@@ -116,20 +131,31 @@ export const useSetValue: UseSetValue = (formState) => {
       } else {
         const customFields = customFieldElements.current?.[fieldName] || [];
 
-        if (!customFields.length) return;
-
-        fieldValues.setValue((old) => setNestedValue(old, fieldName, value));
-
-        const setValueCb = customFieldCallbacks.current?.[fieldName]?.setValue;
-        if (setValueCb) {
-          setValueCb(value);
+        if (customFields.length) {
+          const setValueCb = customFieldCallbacks.current?.[fieldName]?.setValue;
+          if (setValueCb) {
+            setValueCb(value);
+          }
         }
 
+        // update even if not in DOM
+        fieldValues.setValue((old) => setNestedValue(old, fieldName, value));
         updateExternallySet(fieldName, true);
         touchField(fieldName);
-        return;
+        if (triggerValidation) {
+          triggerValidationFn(fieldName);
+        }
       }
     },
-    [customFieldCallbacks, customFieldElements, fieldValues, nativeFieldElements, touchField, updateExternallySet]
+    [
+      customFieldCallbacks,
+      customFieldElements,
+      fieldValues,
+      nativeFieldElements,
+      optionsRef,
+      touchField,
+      triggerValidationFn,
+      updateExternallySet,
+    ]
   );
 };

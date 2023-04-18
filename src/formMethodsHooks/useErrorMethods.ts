@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { FieldError, FormInternalState } from "../useForm";
 
 export type SetFieldError = (fieldName: string, error: FieldError) => void;
-export type ClearFieldsErrors = (fieldNames: string | string[] | undefined) => void;
+export type ClearFieldsErrors = (fieldNames?: string | string[]) => void;
 export type GetFieldError = (fieldName: string) => FieldError;
 
 export type FormErrorMethods = {
@@ -13,30 +13,41 @@ export type FormErrorMethods = {
 export type UseFormErrorMethods = (formState: FormInternalState) => FormErrorMethods;
 
 export const useErrorMethods: UseFormErrorMethods = (formState) => {
-  const { fieldsNames } = formState;
+  const { fieldsNames, optionsRef, formErrors } = formState;
   const setError = useCallback<SetFieldError>(
     (fieldName, error) => {
-      formState.formErrors.setValue(() => {
-        const r = { ...formState.formErrors.current };
+      if (optionsRef.current.debug?.logSetError?.includes(fieldName)) {
+        console.log("[FORMS-DEBUG] [logSetError] Tracing set error: ", fieldName);
+        console.log("[FORMS-DEBUG] [logSetError] New error value: ", error);
+        console.trace(fieldName);
+      }
+      formErrors.setValue(() => {
+        const r = { ...formErrors.current };
         if (error === null) {
           delete r[fieldName];
-        } else if (formState.fieldsNames().includes(fieldName)) {
+        } else if (fieldsNames().includes(fieldName)) {
           r[fieldName] = error;
         }
         return r;
       }, [fieldName]);
     },
-    [formState]
+    [fieldsNames, formErrors, optionsRef]
   );
   const clearErrors = useCallback<ClearFieldsErrors>(
     (_fieldNames) => {
       const fieldNames =
         _fieldNames === undefined ? fieldsNames() : typeof _fieldNames === "string" ? [_fieldNames] : _fieldNames;
 
-      formState.formErrors.setValue(() => {
+      fieldNames.forEach((fieldName) => {
+        if (optionsRef.current.debug?.logSetError?.includes(fieldName)) {
+          console.log("[FORMS-DEBUG] [logSetError] Tracing clear error: ", fieldName);
+          console.trace(fieldName);
+        }
+      });
+      formErrors.setValue(() => {
         if (!fieldNames) return {};
 
-        const n = { ...formState.formErrors.current };
+        const n = { ...formErrors.current };
 
         fieldNames.forEach((fName) => {
           delete n[fName];
@@ -45,7 +56,7 @@ export const useErrorMethods: UseFormErrorMethods = (formState) => {
         return n;
       }, fieldNames);
     },
-    [fieldsNames, formState.formErrors]
+    [fieldsNames, formErrors, optionsRef]
   );
 
   const getError = useCallback<GetFieldError>(

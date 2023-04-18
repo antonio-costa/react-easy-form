@@ -1,16 +1,19 @@
-import { FormContextValue } from "../useForm";
-import { useWatch, UseWatchErrorValue } from "./useWatch";
+import { FieldError, FieldGroupErrors, FormContextValue } from "../useForm";
+import { useWatch, UseWatchSpecific } from "./useWatch";
 
 export type WatchErrorOptions = {
   formContext?: FormContextValue;
   flatten?: boolean;
 };
 
-export const useWatchError = (fieldNameOrPath?: string, options?: WatchErrorOptions): UseWatchErrorValue => {
+export const useWatchError: UseWatchSpecific<FieldGroupErrors, FieldError, WatchErrorOptions> = (
+  fieldNameOrPath,
+  options
+) => {
   return useWatch(fieldNameOrPath, {
     watchErrors: true,
     watchValues: false,
     flattenErrorObject: options?.flatten,
     formContext: options?.formContext,
-  }).error;
+  }).error as any;
 };

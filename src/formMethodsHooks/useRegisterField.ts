@@ -1,11 +1,10 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { FieldValidator, FieldValue, FormInternalState, FormNativeFieldElement } from "../useForm";
 import { isCheckboxField, isRadioField, isSelectField, typifyFieldValue } from "../util/getFieldValue";
 import { getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
-import { useGetValue } from "./useGetValue";
-import { useGetValues } from "./useGetValues";
 import { useSyncNativeDefaultValue } from "./useSyncNativeDefaultValue";
 import { useTouchField } from "./useTouchField";
+import { useTriggerValidation } from "./useTriggerValidation";
 import { useUpdateExternallySet } from "./useUpdateExternallySet";
 
 export type RegisterFieldOptions<T = FormNativeFieldElement> = {
@@ -14,6 +13,7 @@ export type RegisterFieldOptions<T = FormNativeFieldElement> = {
   onBlur?: React.FocusEventHandler<T>;
   validator?: FieldValidator;
   neverDirty?: boolean;
+  validationDeps?: string[];
 };
 
 export type RegisterFieldValue<T = FormNativeFieldElement> = {
@@ -22,6 +22,7 @@ export type RegisterFieldValue<T = FormNativeFieldElement> = {
   value?: string;
   onChange: React.ChangeEventHandler<T> | undefined;
   onBlur: React.FocusEventHandler<T> | undefined;
+  id?: string;
 };
 
 export type RegisterField = <T extends FormNativeFieldElement = FormNativeFieldElement>(
@@ -32,13 +33,19 @@ export type RegisterField = <T extends FormNativeFieldElement = FormNativeFieldE
 export type UseRegisterField = (formState: FormInternalState) => RegisterField;
 
 export const useRegisterField: UseRegisterField = (formState) => {
-  const { nativeFieldElements, defaultValues, fieldValues, fieldsRegisterOptions } = formState;
+  const {
+    nativeFieldElements,
+    defaultValues,
+    fieldValues,
+    fieldsRegisterOptions,
+    fieldsDOMSyncing,
+    fieldsValidationDependencies,
+  } = formState;
 
-  const getValue = useGetValue(formState);
-  const getValues = useGetValues(formState);
   const touchField = useTouchField(formState);
   const updateExternallySet = useUpdateExternallySet(formState);
   const syncNativeDefaultValue = useSyncNativeDefaultValue(formState);
+  const triggerValidation = useTriggerValidation(formState);
 
   const unregisterRef = useCallback(
     (name: string) => {
@@ -55,6 +62,7 @@ export const useRegisterField: UseRegisterField = (formState) => {
         return old;
       });
     },
+
     [nativeFieldElements]
   );
 
@@ -99,10 +107,14 @@ export const useRegisterField: UseRegisterField = (formState) => {
           [name]
         );
       }
+
+      // add validation dependencies
+      fieldsValidationDependencies.current.set(name, new Set(registerOptions?.validationDeps || []));
     },
     [
       defaultValues,
       fieldsRegisterOptions,
+      fieldsValidationDependencies,
       formState.defaultValues,
       formState.fieldValues,
       formState.fieldsTouched,
@@ -111,32 +123,17 @@ export const useRegisterField: UseRegisterField = (formState) => {
       unregisterRef,
     ]
   );
-  const triggerValidation = useCallback(
-    async (fielName: string, fieldValidator?: FieldValidator) => {
-      // form validator
-      if (!formState?.optionsRef?.current?.validator) return;
-      const validation = await formState?.optionsRef.current.validator(getValues(fielName));
-
-      if (formState.formErrors.current[fielName] !== validation.errors[fielName]) {
-        formState.formErrors.setValue({ ...formState.formErrors.current, [fielName]: validation.errors[fielName] }, [
-          fielName,
-        ]);
-      }
-
-      // field validator
-      const fieldErrorMessage = fieldValidator && (await fieldValidator(getValue(fielName), getValues()));
-      if (fieldErrorMessage) {
-        return formState.formErrors.setValue({ ...formState.formErrors.current, [fielName]: fieldErrorMessage }, [fielName]);
-      }
-    },
-    [formState.formErrors, formState?.optionsRef, getValue, getValues]
-  );
 
   const onChange = useCallback(
-    (e: React.ChangeEvent<FormNativeFieldElement>, fieldValidator?: FieldValidator) => {
+    (e: React.ChangeEvent<FormNativeFieldElement>, name: string) => {
+      const onChangeFn = fieldsOptions.current?.[name]?.onChange;
+
+      if (!fieldsDOMSyncing.current.has(name)) {
+        onChangeFn && onChangeFn(e as React.ChangeEvent<FormNativeFieldElement>);
+      }
+
       fieldValues.setValue(
         (old) => {
-          const name = e.currentTarget.name;
           const value = (() => {
             const field = [e.currentTarget];
             if (isCheckboxField(field)) {
@@ -152,96 +149,89 @@ export const useRegisterField: UseRegisterField = (formState) => {
             }
             return typifyFieldValue(field[0].value, field[0].type);
           })();
+
           return setNestedValue(old, name, value);
         },
-        [e.currentTarget.name]
+        [name]
       );
 
-      updateExternallySet(e.currentTarget.name, false);
+      updateExternallySet(name, false);
 
       if (formState.optionsRef.current?.validation?.method === "onchange") {
-        triggerValidation(e.currentTarget.name, fieldValidator);
+        triggerValidation(name);
       }
 
       // touch field if not already
-      touchField(e.currentTarget.name);
+      touchField(name);
+
+      if (fieldsDOMSyncing.current.has(name)) {
+        fieldsDOMSyncing.current.delete(name);
+      }
     },
-    [fieldValues, formState.optionsRef, touchField, triggerValidation, updateExternallySet]
+    [fieldValues, fieldsDOMSyncing, formState.optionsRef, touchField, triggerValidation, updateExternallySet]
   );
 
   const onBlur = useCallback(
-    (e: React.FocusEvent<FormNativeFieldElement>, fieldValidator?: FieldValidator) => {
+    (e: React.FocusEvent<FormNativeFieldElement>, name: string) => {
+      const onBlurFn = fieldsOptions.current?.[name]?.onBlur;
+      onBlurFn && onBlurFn(e as React.FocusEvent<FormNativeFieldElement>);
+
       if (["onchange", "onblur"].includes(formState.optionsRef.current?.validation?.method || "")) {
-        triggerValidation(e.currentTarget.name, fieldValidator);
+        triggerValidation(name);
       }
 
       // touch field if not already
-      touchField(e.currentTarget.name);
+      touchField(name);
     },
     [formState.optionsRef, touchField, triggerValidation]
+  );
+  const fieldsOptions = useRef<Record<string, RegisterFieldOptions<FormNativeFieldElement>>>({});
+  const fieldsProps = useRef<Record<string, RegisterFieldValue<FormNativeFieldElement>>>({});
+
+  const _ref = useCallback(
+    (ref: FormNativeFieldElement | null, name: string) => {
+      const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+
+      if (fieldsOptions.current[name]?.neverDirty && neverDirtyIndex === -1) {
+        formState.fieldsNeverDirty.current.push(name);
+      } else if (!fieldsOptions.current[name]?.neverDirty && neverDirtyIndex !== -1) {
+        formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+      }
+
+      registerRef(ref, name, fieldsOptions.current[name]);
+    },
+    [formState.fieldsNeverDirty, registerRef]
+  );
+
+  const _onChange = useCallback(
+    (e: any, name: string) => {
+      onChange(e as React.ChangeEvent<FormNativeFieldElement>, name);
+    },
+    [onChange]
+  );
+
+  const _onBlur = useCallback(
+    (e: any, name: string) => {
+      onBlur(e as React.FocusEvent<FormNativeFieldElement>, name);
+    },
+    [onBlur]
   );
 
   return useCallback(
     (name, _options) => {
-      const options = _options as RegisterFieldOptions<FormNativeFieldElement> | undefined;
-      // due to standardization concerns, the form.register() function should be able to be used
-      // on CustomFieldControllers. However, these fields have their own registration process
-      // which ignores the above one.
-      // As such we are manually type checking if the form.register() was done on a native input type
-      // and if not, ignore the execution of the respective event functions
-      const ret: RegisterFieldValue<FormNativeFieldElement> = {
-        name,
-        ref: (ref: FormNativeFieldElement | null) => {
-          // add to/remove from never dirty, if required
-          const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
-          if (options?.neverDirty && neverDirtyIndex === -1) {
-            formState.fieldsNeverDirty.current.push(name);
-          } else if (!options?.neverDirty && neverDirtyIndex !== -1) {
-            formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
-          }
+      fieldsOptions.current[name] = (_options || {}) as RegisterFieldOptions<FormNativeFieldElement>;
+      if (!fieldsProps.current[name]) {
+        fieldsProps.current[name] = {
+          name,
+          ref: (r: any) => _ref(r, name),
+          onChange: (e) => _onChange(e, name),
+          onBlur: (e) => _onBlur(e, name),
+          id: `${formState.formId}-fld-${name}`,
+        };
+      }
 
-          if (isNativeFieldElement(ref)) {
-            // we will force options here to be RegisterFieldOptions<FormNativeFieldElement>
-            // because we've checked that ref is of FormNativeFieldElement type
-            registerRef(ref, name, options);
-          } else if (ref === null) {
-            // if ref is null, then the ref will be unregistered from the nativeFieldElements
-            // if this is a CustomFieldController, then this does nothing
-            registerRef(ref as null, name);
-          }
-        },
-        onChange: (e: any) => {
-          // if not a "real" onChange event from a "input", "textarea" or "select", then ignore the onChange function
-          // because this should refer to a CustomFieldController
-          if (isNativeFieldSyntheticEvent(e)) {
-            options?.onChange && options?.onChange(e as React.ChangeEvent<FormNativeFieldElement>);
-            onChange(e as React.ChangeEvent<FormNativeFieldElement>, options?.validator);
-          }
-        },
-        onBlur: (e: any) => {
-          // if not a "real" onBlur event from a "input", "textarea" or "select", then ignore the onChange function
-          // because this should refer to a CustomFieldController
-          if (isNativeFieldSyntheticEvent(e)) {
-            options?.onBlur && options?.onBlur(e as React.FocusEvent<FormNativeFieldElement>);
-            onBlur(e as React.FocusEvent<FormNativeFieldElement>, options?.validator);
-          }
-        },
-      };
-
-      return ret;
+      return fieldsProps.current[name];
     },
-    [formState.fieldsNeverDirty, onBlur, onChange, registerRef]
+    [_onBlur, _onChange, _ref, formState.formId]
   );
-};
-
-const isNativeFieldSyntheticEvent = (e: unknown): e is React.SyntheticEvent<FormNativeFieldElement> => {
-  return (
-    e !== null &&
-    Object.prototype.hasOwnProperty.call(e, "currentTarget") &&
-    ["input", "textarea", "select"].includes((e as any)?.currentTarget?.tagName?.toLowerCase() || "INVALID-INPUT-TAG")
-  );
-};
-
-const isNativeFieldElement = (e: unknown): e is FormNativeFieldElement => {
-  return e !== null && ["input", "textarea", "select"].includes((e as any)?.tagName?.toLowerCase() || "INVALID-INPUT-TAG");
 };

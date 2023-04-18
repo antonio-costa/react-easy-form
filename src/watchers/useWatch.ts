@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "../FormContext";
 import { FieldError, FieldGroupErrors, FieldRecordTouched, FieldValue, FormContextValue } from "../useForm";
-import { flattenObject, getNestedValue } from "../util/misc";
+import { customFilter, flattenObject, getNestedValue } from "../util/misc";
 
 export interface UseWatchOptions {
   watchValues?: boolean;
@@ -17,6 +17,14 @@ export type UseWatchValueValue = FieldValue;
 export type UseWatchErrorValue = FieldGroupErrors | FieldError;
 export type UseWatchTouchedValue = FieldRecordTouched | boolean;
 
+export type EndsWithPeriod<S> = S extends `${string}.` | undefined ? true : false;
+export type ReturnDependingEndsWithPeriod<S, R, RR> = EndsWithPeriod<S> extends true ? R : RR;
+
+export type UseWatchSpecific<R, RR, O> = <S extends string | undefined = undefined>(
+  fieldNameOrPath?: S,
+  options?: O
+) => ReturnDependingEndsWithPeriod<S, R, RR>;
+
 const flattenIfRequired = (object: Record<string, FieldError | FieldValue>, shouldFlatten?: boolean) => ({
   ...(shouldFlatten ? flattenObject(object) : object),
 });
@@ -28,8 +36,19 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
   const form = customFormCtx || formContext;
 
   const isPath = useMemo(() => fieldNameOrPath?.endsWith("."), [fieldNameOrPath]);
-  const [values, setValues] = useState<UseWatchValueValue>(isPath || fieldNameOrPath === undefined ? {} : undefined);
-  const [errors, setErrors] = useState<UseWatchErrorValue>(isPath || fieldNameOrPath === undefined ? {} : undefined);
+  const [values, setValues] = useState<UseWatchValueValue>(
+    isPath || fieldNameOrPath === undefined
+      ? {}
+      : getNestedValue(formContext._formState.fieldValues.current, fieldNameOrPath) ||
+          formContext._formState.optionsRef.current.flattenedDefaultValues?.[fieldNameOrPath]
+  );
+  const [errors, setErrors] = useState<UseWatchErrorValue>(
+    fieldNameOrPath === undefined
+      ? formContext._formState.formErrors.current
+      : isPath
+      ? customFilter(formContext._formState.formErrors.current, ([key]) => key.startsWith(fieldNameOrPath))
+      : formContext._formState.formErrors.current[fieldNameOrPath]
+  );
   const [touched, setTouched] = useState<string[] | boolean>(isPath || fieldNameOrPath === undefined ? [] : false); // this is transformed into an object through a proxy
 
   const setValueFunc = useCallback(() => {
@@ -60,7 +79,7 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
 
   const setTouchedFunc = useCallback(() => {
     if (fieldNameOrPath === undefined) {
-      setTouched(form._formState.fieldsTouched.current);
+      setTouched([...(form._formState.fieldsTouched.current || [])]);
     } else if (isPath) {
       setTouched(form._formState.fieldsTouched.current.filter((fname) => fname.startsWith(fieldNameOrPath)));
     } else {

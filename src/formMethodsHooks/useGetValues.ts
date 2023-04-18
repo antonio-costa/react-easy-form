@@ -1,35 +1,26 @@
 import { useCallback } from "react";
 import { FieldGroupValues, FormInternalState } from "../useForm";
-import { useGetValue } from "./useGetValue";
+import { getNestedValue } from "../util/misc";
 
 export type GetValuesOptions = {
-  flattenObject?: boolean;
+  getFullPath?: boolean;
 };
-export type GetValues = (fieldPath?: string, options?: GetValuesOptions) => FieldGroupValues;
+export type GetValues = (fieldPath?: string, options?: GetValuesOptions) => FieldGroupValues | undefined;
 export type UseGetValues = (formState: FormInternalState) => GetValues;
 export const useGetValues: UseGetValues = (formState): GetValues => {
-  const getValue = useGetValue(formState);
-  const { fieldsNames } = formState;
+  const { fieldValues } = formState;
   return useCallback(
-    (fieldPath, options) => {
-      if (options?.flattenObject) {
-        fieldsNames().reduce<FieldGroupValues>((prev, fieldName) => {
-          prev[fieldName] = getValue(fieldName);
-          return prev;
-        }, {});
+    (fieldName, options) => {
+      if (!fieldName) return fieldValues.current;
+
+      if (!fieldName.endsWith(".")) {
+        throw new Error(
+          `[react-easy-form] Field name for getValues must be undefined or end with a "." (got ${fieldName}).`
+        );
       }
 
-      // return object separated by dot notation
-      return fieldsNames().reduce((prevFormValues: FieldGroupValues, fieldName) => {
-        if (fieldPath && !fieldName.startsWith(fieldPath)) return prevFormValues;
-
-        let temp = prevFormValues;
-        fieldName.split(".").forEach((path, i, array) => {
-          temp = (temp[path] = i === array.length - 1 ? getValue(fieldName) : temp[path] || {}) as FieldGroupValues;
-        });
-        return prevFormValues;
-      }, {} as FieldGroupValues);
+      return getNestedValue(fieldValues.current, fieldName);
     },
-    [fieldsNames, getValue]
+    [fieldValues]
   );
 };

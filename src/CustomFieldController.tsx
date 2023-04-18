@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "./FormContext";
-import { useGetValue, useGetValues } from "./formMethodsHooks";
 import { useTouchField } from "./formMethodsHooks/useTouchField";
+import { useTriggerValidation } from "./formMethodsHooks/useTriggerValidation";
 import { useUpdateExternallySet } from "./formMethodsHooks/useUpdateExternallySet";
 import { CustomFieldCallbacks, FieldValidator, FieldValue, FieldValuePrimitive } from "./useForm";
 import { nestedKeyExists, setNestedValue, shallowEqual } from "./util/misc";
@@ -35,35 +35,10 @@ export const CustomFieldController = ({
   forceUpdateOnSyncDefaultValue,
 }: CustomFieldControllerProps) => {
   const form = useFormContext();
-  const getValue = useGetValue(form._formState);
-  const getValues = useGetValues(form._formState);
   const touchField = useTouchField(form._formState);
   const updateExternallySet = useUpdateExternallySet(form._formState);
 
-  const triggerValidation = useCallback(
-    async (fieldName: string) => {
-      // form validator
-      if (!form._formState?.optionsRef?.current?.validator) return;
-      const validation = await form._formState?.optionsRef.current.validator(getValues(fieldName));
-
-      if (form._formState.formErrors.current[fieldName] !== validation.errors[fieldName]) {
-        form._formState.formErrors.setValue(
-          { ...form._formState.formErrors.current, [fieldName]: validation.errors[fieldName] },
-          [fieldName]
-        );
-      }
-
-      // field validator
-      const fieldErrorMessage = fieldValidator && (await fieldValidator(getValue(fieldName), getValues()));
-      if (fieldErrorMessage) {
-        return form._formState.formErrors.setValue(
-          { ...form._formState.formErrors.current, [fieldName]: fieldErrorMessage },
-          [fieldName]
-        );
-      }
-    },
-    [fieldValidator, form._formState.formErrors, form._formState?.optionsRef, getValue, getValues]
-  );
+  const triggerValidation = useTriggerValidation(form._formState);
 
   const triggerChange = useCallback<CustomFieldControllerOnChangeHandler>(
     ({ name, value }) => {

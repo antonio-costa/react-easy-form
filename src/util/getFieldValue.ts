@@ -64,6 +64,9 @@ const typifyFieldValue = (value: string, type: HTMLInputTypeAttribute = "text"):
   }
   return value ?? undefined;
 };
+export const isNumericField = (type: HTMLInputTypeAttribute = "text"): boolean => {
+  return formNumericalTypes.includes(type);
+};
 
 const getFieldValue = (refs: FormField) => {
   if (isRadioField(refs)) return getRadioValue(refs as HTMLInputElement[], true);

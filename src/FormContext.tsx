@@ -1,9 +1,11 @@
 import { createContext, useContext } from "react";
 import {
+  FieldsDOMSyncing,
   FieldsExternallySet,
   FieldsNeverDirty,
   FieldsRegisterOptions,
   FieldsTouched,
+  FieldsValidationDependencies,
   FieldValuePrimitive,
   FormContextValue,
   FormCustomFieldCallbacks,
@@ -36,10 +38,17 @@ const defaultFormContextValue: FormContextValue = {
   syncDefaultValues: () => null,
   isTouched: () => false,
   setValue: () => null,
+  clearValue: () => null,
   unregister: () => null,
   clearErrors: () => null,
   getError: () => undefined,
   setError: () => null,
+  getDefaultValue: () => undefined,
+  syncDOMValues: () => null,
+  getExternalUpdatedValues: () => [],
+  updateFormOptions: () => null,
+  validate: async () => ({ valid: true, errors: {} }),
+  resetForm: () => null,
   _formState: {
     formId: "",
     nativeFieldElements: emptyObservable<FormNativeFields>({}),
@@ -55,6 +64,8 @@ const defaultFormContextValue: FormContextValue = {
     optionsRef: emptyRef<UseFormOptions>({}),
     fieldsExternallySet: emptyRef<FieldsExternallySet>([]),
     fieldsRegisterOptions: emptyRef<FieldsRegisterOptions>({}),
+    fieldsDOMSyncing: emptyRef<FieldsDOMSyncing>(new Set()),
+    fieldsValidationDependencies: emptyRef<FieldsValidationDependencies>(new Map()),
   },
 };
 

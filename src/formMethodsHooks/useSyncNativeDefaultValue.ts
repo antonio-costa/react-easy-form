@@ -52,7 +52,7 @@ export const useSyncNativeDefaultValue: UseSyncNativeDefaultValue = (formState: 
       }
 
       if (isSelectField([ref])) {
-        if (defaultValue) {
+        if (defaultValue !== undefined) {
           // default value for select is a special case
           // and needs to be defined here.
           // React uses "defaultValue" prop on the <select /> but that prop
@@ -121,11 +121,12 @@ export const useSyncNativeDefaultValue: UseSyncNativeDefaultValue = (formState: 
 
         return;
       }
-
-      if (defaultValue) {
+      if (defaultValue !== undefined) {
         if (isValidField([ref]) || isRangeField([ref])) {
           // TODO: CHECK TYPE
-          if (updateValues) (ref as HTMLInputElement).value = String(defaultValue ?? "");
+          if (updateValues) {
+            (ref as HTMLInputElement).value = defaultValue as string;
+          }
           defaultValues.current[name] = defaultValue;
           return;
         }
@@ -134,10 +135,18 @@ export const useSyncNativeDefaultValue: UseSyncNativeDefaultValue = (formState: 
           const max = Number((ref as HTMLInputElement).max) || 100;
           const min = Number((ref as HTMLInputElement).min) || 0;
           defaultValues.current[name] = Math.round((min + max) / 2);
+
+          if (updateValues) {
+            (ref as HTMLInputElement).value = String(defaultValues.current[name]);
+          }
           return;
         } else if (isValidField([ref])) {
           const typedRef = ref as Exclude<FormNativeFieldElement, HTMLSelectElement>;
           defaultValues.current[name] = typifyFieldValue(typedRef.defaultValue, typedRef.type);
+
+          if (updateValues) {
+            (ref as HTMLInputElement).value = defaultValues.current[name] as any; // should be a string but our inputs accept everything...
+          }
           return;
         }
       }
@@ -153,7 +162,6 @@ export const useSyncNativeDefaultValue: UseSyncNativeDefaultValue = (formState: 
         exists: name in (optionsRef.current?.flattenedDefaultValues || {}),
         value: optionsRef.current?.flattenedDefaultValues?.[name],
       };
-
       if (useFormDefaultValues.exists) {
         syncNativeDefaultValue(ref, { defaultValue: useFormDefaultValues.value, updateValues: updateValues ?? true });
       } else {

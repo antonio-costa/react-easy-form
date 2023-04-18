@@ -2,8 +2,8 @@ import "@testing-library/jest-dom/extend-expect";
 import { render, renderHook } from "@testing-library/react";
 import { act } from "react-test-renderer";
 import { useWatchTouched } from "../src/watchers/useWatchTouched";
-import { changedDefaultValues, defaultInputsProps, InputType, setupFormHook, validDefaultValues } from "./helpers/misc";
 import { TestAllInputs, TestInput } from "./helpers/TextInput";
+import { InputType, changedDefaultValues, defaultInputsProps, setupFormHook, validDefaultValues } from "./helpers/misc";
 
 describe("useWatch: listen to touched fields", () => {
   (Object.keys(defaultInputsProps) as InputType[]).forEach((componentType) => {

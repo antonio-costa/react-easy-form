@@ -6,7 +6,7 @@
 // - select
 // - textarea
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import {
   ClearFieldsErrors,
   ExecuteSubmit,
@@ -33,6 +33,13 @@ import {
   useSyncDefaultValues,
   useUnregisterField,
 } from "./formMethodsHooks";
+import { ClearValue, useClearValue } from "./formMethodsHooks/useClearValue";
+import { GetDefaultValue, useGetDefaultValue } from "./formMethodsHooks/useGetDefaultValue";
+import { GetExternalUpdatedValues, useGetExternalUpdatedValues } from "./formMethodsHooks/useGetExternalUpdatedValues";
+import { ResetForm, useResetForm } from "./formMethodsHooks/useResetForm";
+import { SyncDOMValues, useSyncDOMValues } from "./formMethodsHooks/useSyncDOMValues";
+import { UpdateFormOptions, useUpdateFormOptions } from "./formMethodsHooks/useUpdateOptions";
+import { useValidateForm, ValidateForm } from "./formMethodsHooks/useValidateForm";
 import { Observable, useObservableRef } from "./useObservableRef";
 import { flattenObject } from "./util/misc";
 
@@ -59,7 +66,9 @@ export type FieldsNames = string[];
 export type FieldsExternallySet = string[];
 export type FieldsTouched = string[];
 export type FieldsNeverDirty = string[];
+export type FieldsValidationDependencies = Map<string, Set<string>>;
 export type FieldsRegisterOptions = Record<string, RegisterFieldOptions>;
+export type FieldsDOMSyncing = Set<string>;
 export type FieldRecordTouched = Record<string, boolean>;
 export type FieldError = string | undefined;
 export type FieldGroupErrors = Record<string, FieldError>;
@@ -90,6 +99,7 @@ export type FormContextValue = {
   getValue: GetValue;
   getValues: GetValues;
   setValue: SetValue;
+  clearValue: ClearValue;
   setError: SetFieldError;
   clearErrors: ClearFieldsErrors;
   getError: GetFieldError;
@@ -100,6 +110,12 @@ export type FormContextValue = {
   isDirty: IsDirty;
   syncDefaultValues: SyncDefaultValues;
   isTouched: IsTouched;
+  getDefaultValue: GetDefaultValue;
+  getExternalUpdatedValues: GetExternalUpdatedValues;
+  syncDOMValues: SyncDOMValues;
+  updateFormOptions: UpdateFormOptions;
+  validate: ValidateForm;
+  resetForm: ResetForm;
   _formState: FormInternalState;
   /*
   isTouched (low priority)
@@ -125,6 +141,8 @@ export type FormInternalState = {
   fieldsNeverDirty: React.MutableRefObject<FieldsNeverDirty>;
   fieldsExternallySet: React.MutableRefObject<FieldsExternallySet>;
   fieldsRegisterOptions: React.MutableRefObject<FieldsRegisterOptions>;
+  fieldsDOMSyncing: React.MutableRefObject<FieldsDOMSyncing>;
+  fieldsValidationDependencies: React.MutableRefObject<FieldsValidationDependencies>;
 };
 export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroupValues };
 export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
@@ -136,6 +154,11 @@ export type UseFormOptions = {
   validation?: FormValidationObject;
   defaultValues?: FieldGroupValues;
   neverDirty?: FieldsNeverDirty;
+  debug?: {
+    logDirty?: boolean;
+    logSetValue?: string[];
+    logSetError?: string[];
+  };
 };
 export type UseFormOptionsRef = UseFormOptions & {
   flattenedDefaultValues?: Record<string, FieldValuePrimitive>;
@@ -160,10 +183,8 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const defaultValues = useRef<Record<string, FieldValuePrimitive>>({});
   const fieldsExternallySet = useRef<FieldsExternallySet>([]);
   const fieldOptions = useRef<FieldsRegisterOptions>({});
-
-  useEffect(() => {
-    optionsRef.current = generateUseFormOptionsRef(options);
-  }, [options]);
+  const fieldsDOMSyncing = useRef<FieldsDOMSyncing>(new Set());
+  const fieldsValidationDependencies = useRef<FieldsValidationDependencies>(new Map());
 
   const formInternalState = useMemo<FormInternalState>(
     () => ({
@@ -188,6 +209,8 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       optionsRef,
       fieldsNeverDirty,
       fieldsExternallySet,
+      fieldsDOMSyncing,
+      fieldsValidationDependencies,
       fieldsRegisterOptions: fieldOptions,
     }),
     [nativeFieldElements, customFieldElements, fieldValues, fieldsTouched, formErrors, formId]
@@ -199,10 +222,17 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const register = useRegisterField(formInternalState);
   const unregister = useUnregisterField(formInternalState);
   const setValue = useSetValue(formInternalState);
+  const clearValue = useClearValue(formInternalState);
   const isDirty = useIsDirty(formInternalState);
   const isTouched = useIsTouched(formInternalState);
   const { setError, clearErrors, getError } = useErrorMethods(formInternalState);
   const syncDefaultValues = useSyncDefaultValues(formInternalState);
+  const getDefaultValue = useGetDefaultValue(formInternalState);
+  const syncDOMValues = useSyncDOMValues(formInternalState);
+  const getExternalUpdatedValues = useGetExternalUpdatedValues(formInternalState);
+  const updateFormOptions = useUpdateFormOptions(formInternalState);
+  const validate = useValidateForm(formInternalState);
+  const resetForm = useResetForm(formInternalState);
 
   return useMemo(() => {
     return {
@@ -218,9 +248,16 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       fieldValues,
       formId,
       setValue,
+      clearValue,
       isDirty,
       syncDefaultValues,
       unregister,
+      getDefaultValue,
+      syncDOMValues,
+      getExternalUpdatedValues,
+      updateFormOptions,
+      validate,
+      resetForm,
       _formState: formInternalState,
     };
   }, [
@@ -236,9 +273,16 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
     fieldValues,
     formId,
     setValue,
+    clearValue,
     isDirty,
     syncDefaultValues,
     unregister,
+    getDefaultValue,
+    syncDOMValues,
+    getExternalUpdatedValues,
+    updateFormOptions,
+    validate,
+    resetForm,
     formInternalState,
   ]);
 };
