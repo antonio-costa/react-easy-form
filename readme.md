@@ -4,15 +4,15 @@
 
 ### High Priority
 
-- Create `resetField()`, `resetForm()`, ~~`syncDefaultValues()`~~ methods.
+- Complete unit testing
+- Update support for Custom Controllers
 
 ### Low Priority
 
 - Add default values for undefined default values for all input types (`button`, `color`, `date`, `datetime-local`, `email`, `file`, `hidden`, `image`, `month`, `password`, `reset`, `search`, `submit`, `tel`, `time`, `url`, `week`)
 - Add form inputMapper and outputMapper?
 - Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered). How should `getValues()` handle this?
-- Add debug tools for `isDirty()` (console log all dirty fields)
-- Add debug tools for `setValue()` (to know from where it was called, if necessary)
+
 - Add error handling (generic function to catch thrown errors)
 - Fix `ref` type of `CustomFieldController`
 
@@ -29,6 +29,9 @@
 - ~~Add support for `touched` functionality.~~
 - ~~Change getValue and getValues to retrieve values from \_formState instead of the DOM. (Need to make sure that \_formState is always up to date)~~
 - ~~Add never dirty.~~
+- ~~Create `resetField()`, `resetForm()`, `syncDefaultValues()` methods.~~
+- ~~Add debug tools for `setValue()` (to know from where it was called, if necessary)~~
+- ~~Add debug tools for `isDirty()` (console log all dirty fields)~~
 
 ## How to use (TO DO)
 
@@ -78,7 +81,7 @@ function App() {
 
 This is used to register a new form. The reference for the returned `form` always remains the same , so it is safe to pass as a prop or hook dependency, for example.
 
-### Methods
+### Methods (WIP)
 
 - `register(name: string, options?: RegisterFieldOptions)` - Registers a new field. Options properties below:
   - `defaultOption?: string` - used only to define the default value for `<select />` inputs.
@@ -87,4 +90,17 @@ This is used to register a new form. The reference for the returned `form` alway
 - `getValues(fieldPath?: string)` - Returns the values for the the specified path (using dot notation). If no fieldPath is specified, the whole form is returned.
 - `isDirty(fieldName?: string)` - Returns true/false if the form contains values different from the initially set on defaultValue prop.
 - `setValue(fieldName: string, value: FieldValue)` - Sets the value for a field.
-  Returns the value from a single field
+- `clearValue: ClearValue;`
+- `setError: SetFieldError;`
+- `clearErrors: ClearFieldsErrors;`
+- `getError: GetFieldError;`
+- `executeSubmit: ExecuteSubmit;`
+- `isDirty: IsDirty;`
+- `syncDefaultValues: SyncDefaultValues;`
+- `isTouched: IsTouched;`
+- `getDefaultValue: GetDefaultValue;`
+- `getExternalUpdatedValues: GetExternalUpdatedValues;`
+- `syncDOMValues: SyncDOMValues;`
+- `updateFormOptions: UpdateFormOptions;`
+- `validate: ValidateForm;`
+- `resetForm: ResetForm;`
