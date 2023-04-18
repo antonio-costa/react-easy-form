@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "../FormContext";
 import { FieldError, FieldGroupErrors, FieldRecordTouched, FieldValue, FormContextValue } from "../useForm";
-import { dotNotationSetValue, flattenObject, getNestedValue } from "../util/misc";
+import { flattenObject, getNestedValue } from "../util/misc";
 
 export interface UseWatchOptions {
   watchValues?: boolean;
@@ -13,6 +13,10 @@ export interface UseWatchOptions {
   flattenTouchedObject?: boolean;
 }
 
+export type UseWatchValueValue = FieldValue;
+export type UseWatchErrorValue = FieldGroupErrors | FieldError;
+export type UseWatchTouchedValue = FieldRecordTouched | boolean;
+
 const flattenIfRequired = (object: Record<string, FieldError | FieldValue>, shouldFlatten?: boolean) => ({
   ...(shouldFlatten ? flattenObject(object) : object),
 });
@@ -23,11 +27,10 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
   const formContext = useFormContext();
   const form = customFormCtx || formContext;
 
-  const [values, setValues] = useState<FieldValue>();
-  const [errors, setErrors] = useState<FieldGroupErrors | FieldError>();
-  const [touched, setTouched] = useState<FieldRecordTouched | boolean>();
-
   const isPath = useMemo(() => fieldNameOrPath?.endsWith("."), [fieldNameOrPath]);
+  const [values, setValues] = useState<UseWatchValueValue>(isPath || fieldNameOrPath === undefined ? {} : undefined);
+  const [errors, setErrors] = useState<UseWatchErrorValue>(isPath || fieldNameOrPath === undefined ? {} : undefined);
+  const [touched, setTouched] = useState<string[] | boolean>(isPath || fieldNameOrPath === undefined ? [] : false); // this is transformed into an object through a proxy
 
   const setValueFunc = useCallback(() => {
     if (fieldNameOrPath === undefined) {
@@ -56,28 +59,14 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
   }, [fieldNameOrPath, form._formState.formErrors, isPath, options?.flattenErrorObject]);
 
   const setTouchedFunc = useCallback(() => {
-    const fieldsNames = form._formState.fieldsNames();
-    if (fieldNameOrPath !== undefined && fieldsNames.includes(fieldNameOrPath)) {
-      setTouched(form._formState.fieldsTouched.current.includes(fieldNameOrPath));
-    } else if (fieldNameOrPath !== undefined) {
-      // TODO: Optimize this function
-      const fieldsTouchedRecord: FieldRecordTouched = fieldsNames.reduce<FieldRecordTouched>(
-        (prev, currFieldElementName) => {
-          if (!currFieldElementName.startsWith(fieldNameOrPath)) return prev;
-          const touched = form._formState.fieldsTouched.current.includes(currFieldElementName);
-          if (options?.flattenTouchedObject) {
-            prev[currFieldElementName] = touched;
-          }
-          return dotNotationSetValue(prev, currFieldElementName, touched);
-        },
-        {}
-      );
-
-      setTouched(fieldsTouchedRecord);
+    if (fieldNameOrPath === undefined) {
+      setTouched(form._formState.fieldsTouched.current);
+    } else if (isPath) {
+      setTouched(form._formState.fieldsTouched.current.filter((fname) => fname.startsWith(fieldNameOrPath)));
     } else {
-      setTouched(undefined);
+      setTouched(form._formState.fieldsTouched.current.includes(fieldNameOrPath));
     }
-  }, [fieldNameOrPath, form._formState, options?.flattenTouchedObject]);
+  }, [fieldNameOrPath, form._formState, isPath]);
 
   useEffect(() => {
     const unsubFuncs: (() => void)[] = [];
@@ -125,7 +114,7 @@ export const useWatch = <T extends FieldValue>(fieldNameOrPath?: string, options
   ]);
 
   return useMemo(() => {
-    return { value: values as T, error: errors as any, touched: touched as any };
+    return { value: values as T, error: errors, touched: touchedProxy(touched) };
   }, [errors, touched, values]);
 };
 
@@ -136,4 +125,17 @@ const filterRecord = (record: Record<string, any>, keyFilter: string) => {
     }
     return prev;
   }, {});
+};
+
+const touchedProxy = (touched: string[] | boolean): UseWatchTouchedValue => {
+  if (typeof touched === "boolean") return touched;
+
+  return new Proxy(
+    touched.reduce<Record<string, boolean>>((p, n) => ((p[n] = true), p), {}),
+    {
+      get(_, key) {
+        return typeof key === "string" ? touched.includes(key) : false;
+      },
+    }
+  );
 };

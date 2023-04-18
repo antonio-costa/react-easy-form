@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { FormInternalState } from "../useForm";
+import { shallowEqual } from "../util/misc";
 import { useGetValue } from "./useGetValue";
 
 export type IsDirty = (fieldNames?: string | string[]) => boolean;
@@ -13,7 +14,7 @@ export const useIsDirty: UseIsDirty = (formState) => {
       const allDefaultOptions = { ...defaultValues.current, ...(optionsRef.current?.defaultValues || {}) };
 
       const dirtyField = fnames.find(
-        (fname) => getValue(fname) !== allDefaultOptions[fname] && !fieldsNeverDirty.current.includes(fname)
+        (fname) => !shallowEqual(getValue(fname), allDefaultOptions[fname]) && !fieldsNeverDirty.current.includes(fname)
       );
       return dirtyField !== undefined;
     },

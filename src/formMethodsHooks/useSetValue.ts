@@ -1,11 +1,14 @@
 import { useCallback } from "react";
 import { FieldValue, FieldValuePrimitive, FormInternalState } from "../useForm";
-import { isCheckboxField, isRadioField, isValidField } from "../util/getFieldValue";
+import { isCheckboxField, isRadioField, isSelectField, isValidField } from "../util/getFieldValue";
 import { formNumericalTypes, setNestedValue } from "../util/misc";
 import { useTouchField } from "./useTouchField";
 import { useUpdateExternallySet } from "./useUpdateExternallySet";
 
-export const useSetValue = (formState: FormInternalState) => {
+export type SetValue = (fieldName: string, value: FieldValuePrimitive) => void;
+export type UseSetValue = (formState: FormInternalState) => SetValue;
+
+export const useSetValue: UseSetValue = (formState) => {
   const { fieldValues, nativeFieldElements, customFieldElements, customFieldCallbacks } = formState;
 
   const touchField = useTouchField(formState);
@@ -36,16 +39,15 @@ export const useSetValue = (formState: FormInternalState) => {
         } else if (isRadioField(fieldEls)) {
           if (typeof value === "string" || typeof value === undefined) {
             (fieldEls as HTMLInputElement[]).forEach((el) => {
-              if (el.name === fieldName) {
-                el.checked = true;
+              el.checked = el.value === value;
+
+              if (el.checked) {
                 fieldValues.setValue(
                   (old) => {
                     return setNestedValue<FieldValue>(old, fieldName, el.value);
                   },
                   [fieldName]
                 );
-              } else {
-                el.checked = false;
               }
 
               el.dispatchEvent(new Event("change"));
@@ -57,6 +59,35 @@ export const useSetValue = (formState: FormInternalState) => {
           } else {
             throw new Error(`Radio [${fieldName}] expected string or undefined but got ${value} (${typeof value})`);
           }
+        } else if (isSelectField(fieldEls)) {
+          const typedEl = fieldEls[0] as HTMLSelectElement;
+
+          if (typedEl.multiple) {
+            if (!Array.isArray(value)) {
+              throw new Error(`Input [${fieldName}] expected string[] but got ${value} (${typeof value})`);
+            } else if (Array.isArray(value) && value.some((v) => typeof v !== "string")) {
+              throw new Error(
+                `Input [${fieldName}] expected string[] but got ${value.map((v) => `${v} (${typeof v})`).join(",")}`
+              );
+            }
+          } else if (typeof value !== "string") {
+            throw new Error(`Input [${fieldName}] expected string but got ${value} (${typeof value})`);
+          }
+
+          fieldValues.setValue(
+            (old) => {
+              return setNestedValue(old, fieldEls[0].name, value);
+            },
+            [fieldEls[0].name]
+          );
+
+          const fValue = typeof value === "number" ? String(value) : (value as string);
+          fieldEls[0].value = fValue;
+
+          (fieldEls[0] as HTMLInputElement).dispatchEvent(new Event("input"));
+
+          updateExternallySet(fieldName, true);
+          touchField(fieldName);
         } else if (isValidField(fieldEls)) {
           const expectedType = formNumericalTypes.includes(fieldEls[0].type) ? "number" : "string";
 
@@ -64,14 +95,14 @@ export const useSetValue = (formState: FormInternalState) => {
             throw new Error(`Input [${fieldName}] expected ${expectedType} but got ${value} (${typeof value})`);
           }
 
-          const fValue = typeof value === "number" ? String(value) : (value as string);
           fieldValues.setValue(
             (old) => {
-              return setNestedValue(old, fieldEls[0].name, fValue);
+              return setNestedValue(old, fieldEls[0].name, value);
             },
             [fieldEls[0].name]
           );
 
+          const fValue = typeof value === "number" ? String(value) : (value as string);
           fieldEls[0].value = fValue;
 
           (fieldEls[0] as HTMLInputElement).dispatchEvent(new Event("input"));

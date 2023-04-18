@@ -8,24 +8,31 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import {
+  ClearFieldsErrors,
   ExecuteSubmit,
+  GetFieldError,
   GetValue,
   GetValues,
   IsDirty,
+  IsTouched,
   RegisterField,
   RegisterFieldOptions,
   RegisterForm,
+  SetFieldError,
+  SetValue,
+  SyncDefaultValues,
   UnregisterField,
   useErrorMethods,
   useGetValue,
   useGetValues,
   useIsDirty,
+  useIsTouched,
   useRegisterField,
   useRegisterForm,
   useSetValue,
+  useSyncDefaultValues,
   useUnregisterField,
 } from "./formMethodsHooks";
-import { IsTouched, useIsTouched } from "./formMethodsHooks/useIsTouched";
 import { Observable, useObservableRef } from "./useObservableRef";
 import { flattenObject } from "./util/misc";
 
@@ -54,26 +61,25 @@ export type FieldsTouched = string[];
 export type FieldsNeverDirty = string[];
 export type FieldsRegisterOptions = Record<string, RegisterFieldOptions>;
 export type FieldRecordTouched = Record<string, boolean>;
-export type FieldError = string;
+export type FieldError = string | undefined;
 export type FieldGroupErrors = Record<string, FieldError>;
-export type FieldValidator = (fieldValue: FieldValue, formData: FormFieldValues) => string | null;
+export type FieldValidator = (fieldValue: FieldValue, formData: FormFieldValues) => Promise<string | null>;
 export type FormErrors = FieldGroupErrors;
 export type FormValidation = {
   valid: boolean;
   errors: FormErrors;
 };
 
-// export type FormMapper = (data: FormFieldValues) => FormFieldValues;
-
-export type FormValidator = (data: FormFieldValues) => FormValidation;
+export type FormValidator = (data: FormFieldValues) => Promise<FormValidation>;
 
 export type CustomFieldCallbacks = {
   setValue?: (value: FieldValuePrimitive) => void;
+  syncDefaultValue?: () => void;
 };
 export type FormCustomFieldCallbacks = Record<string, CustomFieldCallbacks>;
 
 /*
-  NOTE:
+  !! NOTE
     In order to unify how to handle all inputs internally, a "field" is defined
     as an array of HTMLFormFieldElement with the same name.
 */
@@ -83,14 +89,16 @@ export type FormContextValue = {
   formId: FormId;
   getValue: GetValue;
   getValues: GetValues;
-  setValue: (fieldName: string, value: FieldValuePrimitive) => void;
-  setError: any;
-  clearErrors: any;
+  setValue: SetValue;
+  setError: SetFieldError;
+  clearErrors: ClearFieldsErrors;
+  getError: GetFieldError;
   register: RegisterField;
   unregister: UnregisterField;
   registerForm: RegisterForm;
   executeSubmit: ExecuteSubmit;
   isDirty: IsDirty;
+  syncDefaultValues: SyncDefaultValues;
   isTouched: IsTouched;
   _formState: FormInternalState;
   /*
@@ -122,7 +130,6 @@ export type FormSchema = { [fieldName: string]: FieldValuePrimitive | FieldGroup
 export type FormValidationMethod = "onsubmit" | "onblur" | "onchange";
 export type FormValidationObject = {
   method?: FormValidationMethod;
-  flattenObject?: boolean;
 };
 export type UseFormOptions = {
   validator?: FormValidator;
@@ -194,7 +201,8 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
   const setValue = useSetValue(formInternalState);
   const isDirty = useIsDirty(formInternalState);
   const isTouched = useIsTouched(formInternalState);
-  const { setError, clearErrors } = useErrorMethods(formInternalState);
+  const { setError, clearErrors, getError } = useErrorMethods(formInternalState);
+  const syncDefaultValues = useSyncDefaultValues(formInternalState);
 
   return useMemo(() => {
     return {
@@ -206,10 +214,12 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
       isTouched,
       setError,
       clearErrors,
+      getError,
       fieldValues,
       formId,
       setValue,
       isDirty,
+      syncDefaultValues,
       unregister,
       _formState: formInternalState,
     };
@@ -222,10 +232,12 @@ const useForm = (formId: string, options?: UseFormOptions): FormContextValue => 
     isTouched,
     setError,
     clearErrors,
+    getError,
     fieldValues,
     formId,
     setValue,
     isDirty,
+    syncDefaultValues,
     unregister,
     formInternalState,
   ]);

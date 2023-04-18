@@ -1,32 +1,38 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useFormContext } from "./FormContext";
 import { useGetValue, useGetValues } from "./formMethodsHooks";
 import { useTouchField } from "./formMethodsHooks/useTouchField";
 import { useUpdateExternallySet } from "./formMethodsHooks/useUpdateExternallySet";
 import { CustomFieldCallbacks, FieldValidator, FieldValue, FieldValuePrimitive } from "./useForm";
-import { nestedKeyExists, setNestedValue } from "./util/misc";
+import { nestedKeyExists, setNestedValue, shallowEqual } from "./util/misc";
 
 export type CustomFieldControllerOnChangeHandler = (target: { name: string; value: FieldValuePrimitive }) => void;
 export type CustomFieldControllerOnBlurHandler = (target: { name: string }) => void;
 
+export type CustomFieldControllerChildren = (fieldProps: {
+  triggerChange: CustomFieldControllerOnChangeHandler;
+  triggerBlur: CustomFieldControllerOnBlurHandler;
+  ref: any;
+  defaultValue: FieldValuePrimitive;
+}) => React.ReactNode;
+
 export interface CustomFieldControllerProps {
-  children: (fieldProps: {
-    triggerChange: CustomFieldControllerOnChangeHandler;
-    triggerBlur: CustomFieldControllerOnBlurHandler;
-    ref: any;
-    defaultValue: FieldValuePrimitive;
-  }) => React.ReactNode;
+  children: CustomFieldControllerChildren;
   defaultValue?: FieldValuePrimitive;
   fieldValidator?: FieldValidator;
   onSetValue?: CustomFieldCallbacks["setValue"];
   name: string;
+  neverDirty?: boolean;
+  forceUpdateOnSyncDefaultValue?: boolean;
 }
 export const CustomFieldController = ({
   children,
   name,
   fieldValidator,
   onSetValue,
-  defaultValue,
+  defaultValue: defaultValueProp,
+  neverDirty,
+  forceUpdateOnSyncDefaultValue,
 }: CustomFieldControllerProps) => {
   const form = useFormContext();
   const getValue = useGetValue(form._formState);
@@ -35,19 +41,10 @@ export const CustomFieldController = ({
   const updateExternallySet = useUpdateExternallySet(form._formState);
 
   const triggerValidation = useCallback(
-    (fieldName: string, fieldValidator?: FieldValidator) => {
-      // field validator
-      const fieldErrorMessage = fieldValidator && fieldValidator(getValue(fieldName), getValues());
-      if (fieldErrorMessage) {
-        return form._formState.formErrors.setValue(
-          { ...form._formState.formErrors.current, [fieldName]: fieldErrorMessage },
-          [fieldName]
-        );
-      }
-
+    async (fieldName: string) => {
       // form validator
       if (!form._formState?.optionsRef?.current?.validator) return;
-      const validation = form._formState?.optionsRef.current.validator(getValues(fieldName));
+      const validation = await form._formState?.optionsRef.current.validator(getValues(fieldName));
 
       if (form._formState.formErrors.current[fieldName] !== validation.errors[fieldName]) {
         form._formState.formErrors.setValue(
@@ -55,8 +52,17 @@ export const CustomFieldController = ({
           [fieldName]
         );
       }
+
+      // field validator
+      const fieldErrorMessage = fieldValidator && (await fieldValidator(getValue(fieldName), getValues()));
+      if (fieldErrorMessage) {
+        return form._formState.formErrors.setValue(
+          { ...form._formState.formErrors.current, [fieldName]: fieldErrorMessage },
+          [fieldName]
+        );
+      }
     },
-    [form._formState.formErrors, form._formState?.optionsRef, getValue, getValues]
+    [fieldValidator, form._formState.formErrors, form._formState?.optionsRef, getValue, getValues]
   );
 
   const triggerChange = useCallback<CustomFieldControllerOnChangeHandler>(
@@ -67,46 +73,23 @@ export const CustomFieldController = ({
         return nestedValue;
       }, [name]);
 
-      // set the field value (default values)
-      if (
-        !form._formState.fieldsTouched.current.includes(name) &&
-        !nestedKeyExists(form._formState.fieldValues.current, name)
-      ) {
-        const defaultValueDefined = name in form._formState.defaultValues.current;
-        const nestedValue = setNestedValue<FieldValue>(
-          form._formState.fieldValues.current,
-          name,
-          defaultValueDefined ? form._formState.defaultValues.current[name] : undefined
-        );
-
-        form._formState.fieldValues.setValue(() => {
-          return nestedValue;
-        }, [name]);
+      if (["onchange"].includes(form._formState.optionsRef.current?.validation?.method || "")) {
+        triggerValidation(name);
       }
-
-      triggerValidation(name, fieldValidator);
       touchField(name);
       updateExternallySet(name, false);
     },
-    [
-      fieldValidator,
-      form._formState.defaultValues,
-      form._formState.fieldValues,
-      form._formState.fieldsTouched,
-      touchField,
-      triggerValidation,
-      updateExternallySet,
-    ]
+    [form._formState.fieldValues, form._formState.optionsRef, touchField, triggerValidation, updateExternallySet]
   );
 
   const triggerBlur = useCallback<CustomFieldControllerOnBlurHandler>(
     ({ name }) => {
       if (["onchange", "onblur"].includes(form._formState.optionsRef.current?.validation?.method || "")) {
-        triggerValidation(name, fieldValidator);
+        triggerValidation(name);
       }
       touchField(name);
     },
-    [fieldValidator, form._formState.optionsRef, touchField, triggerValidation]
+    [form._formState.optionsRef, touchField, triggerValidation]
   );
 
   const handleRef = useCallback(
@@ -129,7 +112,7 @@ export const CustomFieldController = ({
         form._formState.customFieldCallbacks.current[name] = {
           ...(form._formState.customFieldCallbacks.current[name] || {}),
           setValue: (value) => {
-            triggerValidation(name, fieldValidator);
+            triggerValidation(name);
             touchField(name);
             updateExternallySet(name, false);
             onSetValue && onSetValue(value);
@@ -138,7 +121,7 @@ export const CustomFieldController = ({
 
         // set the default value
         if (!(name in form._formState.defaultValues.current)) {
-          form._formState.defaultValues.current[name] = defaultValue;
+          form._formState.defaultValues.current[name] = defaultValueProp;
         }
 
         if (
@@ -146,32 +129,80 @@ export const CustomFieldController = ({
           !nestedKeyExists(form._formState.fieldValues.current, name)
         ) {
           form._formState.fieldValues.setValue(
-            (old) => {
-              const defaultValueDefined = name in form._formState.defaultValues.current;
-              return setNestedValue<FieldValue>(
-                old,
-                name,
-                defaultValueDefined ? form._formState.defaultValues.current[name] : undefined
-              );
-            },
+            setNestedValue<FieldValue>(
+              form._formState.fieldValues.current,
+              name,
+              form._formState.defaultValues.current[name]
+            ),
             [name]
           );
+        }
+
+        // add to/remove from never dirty, if required
+        const neverDirtyIndex = form._formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+        if (neverDirty && neverDirtyIndex === -1) {
+          form._formState.fieldsNeverDirty.current.push(name);
+        } else if (!neverDirty && neverDirtyIndex !== -1) {
+          form._formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+        }
+
+        // add field validator
+        if (fieldValidator && form._formState.fieldsRegisterOptions.current?.[name]?.validator === undefined) {
+          form._formState.fieldsRegisterOptions.current[name] = {
+            ...(form._formState.fieldsRegisterOptions.current[name] || {}),
+            validator: fieldValidator,
+          };
         }
       }
 
       form;
     },
-    [defaultValue, fieldValidator, form, name, onSetValue, touchField, triggerValidation, updateExternallySet]
+    [
+      defaultValueProp,
+      fieldValidator,
+      form,
+      name,
+      neverDirty,
+      onSetValue,
+      touchField,
+      triggerValidation,
+      updateExternallySet,
+    ]
   );
 
+  const [defaultValueStateful, setDefaultValueStateful] = useState(defaultValueProp);
+
+  useEffect(() => {
+    if (
+      form._formState.customFieldCallbacks.current[name] &&
+      (!shallowEqual(form._formState.defaultValues.current[name], defaultValueProp) ||
+        form._formState.customFieldCallbacks.current[name]?.syncDefaultValue === undefined)
+    ) {
+      form._formState.customFieldCallbacks.current[name].syncDefaultValue = () => {
+        form._formState.defaultValues.current[name] = defaultValueProp;
+        if (forceUpdateOnSyncDefaultValue) setDefaultValueStateful(defaultValueProp);
+      };
+    }
+  }, [
+    defaultValueProp,
+    forceUpdateOnSyncDefaultValue,
+    form._formState.customFieldCallbacks,
+    form._formState.defaultValues,
+    name,
+  ]);
+
   const childreMemoed = useMemo(() => {
+    const defVal =
+      name in (form._formState.optionsRef.current?.flattenedDefaultValues || {})
+        ? form._formState.optionsRef.current?.flattenedDefaultValues?.[name]
+        : defaultValueStateful;
     return children({
       triggerChange,
       triggerBlur,
       ref: handleRef,
-      defaultValue: form._formState.optionsRef.current?.flattenedDefaultValues?.[name],
+      defaultValue: defVal,
     });
-  }, [children, form._formState.optionsRef, handleRef, name, triggerBlur, triggerChange]);
+  }, [children, defaultValueStateful, form._formState.optionsRef, handleRef, name, triggerBlur, triggerChange]);
 
   return <>{childreMemoed}</>;
 };

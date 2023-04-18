@@ -1,34 +1,59 @@
 import { useCallback, useMemo } from "react";
-import { FormId, FormInternalState, FormValidation } from "../useForm";
+import { FormErrors, FormInternalState, FormValidation } from "../useForm";
+import { useGetValue } from "./useGetValue";
 import { useGetValues } from "./useGetValues";
 
-export type ExecuteSubmit = (handleExecuteSubmit: (validation: FormValidation) => void) => void;
-export type FormHandleSubmit = (validation: FormValidation, e: React.FormEvent<HTMLFormElement>) => void;
+export type FormHandleSubmit = (validation: Promise<FormValidation>, e?: React.FormEvent<HTMLFormElement>) => void;
+export type ExecuteSubmit = (handleExecuteSubmit: FormHandleSubmit) => void;
 export type RegisterFormOptions = { handleSubmit?: FormHandleSubmit };
 export type UseRegisterForm = (formState: FormInternalState) => { registerForm: RegisterForm; executeSubmit: ExecuteSubmit };
 export type RegisterForm = (options?: RegisterFormOptions) => {
-  id: FormId;
-  onSubmit: React.DOMAttributes<HTMLFormElement>["onSubmit"];
+  onSubmit?: React.DOMAttributes<HTMLFormElement>["onSubmit"];
 };
+export type ExecuteFormValidation = () => Promise<FormValidation>;
 
 export const useRegisterForm: UseRegisterForm = (formState) => {
   const getValues = useGetValues(formState);
-  const { formId, optionsRef } = formState;
+  const getValue = useGetValue(formState);
+  const { formId, optionsRef, fieldsRegisterOptions } = formState;
 
   // executes the form validation
-  const executeFormValidation = useCallback((): FormValidation => {
-    if (!optionsRef?.current?.validator) return { valid: true, errors: {} };
-    const validation = optionsRef.current.validator(
-      getValues(undefined, { flattenObject: optionsRef.current.validation?.flattenObject })
-    );
-    formState.formErrors.setValue(validation.errors);
+  const executeFormValidation = useCallback<ExecuteFormValidation>(async () => {
+    const formValues = getValues();
 
-    return validation;
-  }, [formState.formErrors, getValues, optionsRef]);
+    let errors: FormErrors = {};
+
+    // validator registered through useForm()
+    if (optionsRef?.current?.validator) {
+      const validation = await optionsRef.current.validator(formValues);
+      errors = { ...errors, ...validation.errors };
+    }
+
+    // validators registered through {...form.register()}
+    const fieldsRegisterOptionsEntries = Object.entries(fieldsRegisterOptions.current);
+    for (let i = 0; i < fieldsRegisterOptionsEntries.length; i++) {
+      const fieldName = fieldsRegisterOptionsEntries[i][0];
+      const options = fieldsRegisterOptionsEntries[i][1];
+
+      if (options.validator) {
+        const fieldError = await options.validator(getValue(fieldName), formValues);
+        if (fieldError !== null) {
+          errors = { ...errors, [fieldName]: fieldError };
+        }
+      }
+    }
+
+    formState.formErrors.setValue(errors);
+
+    return {
+      valid: Object.keys(errors).length > 0,
+      errors,
+    };
+  }, [fieldsRegisterOptions, formState.formErrors, getValue, getValues, optionsRef]);
 
   // helper function if you want to submit a form outside the HTML native cycle
   const executeSubmit: ExecuteSubmit = useCallback(
-    (handleExecuteSubmit) => {
+    async (handleExecuteSubmit) => {
       handleExecuteSubmit(executeFormValidation());
     },
     [executeFormValidation]
@@ -37,7 +62,7 @@ export const useRegisterForm: UseRegisterForm = (formState) => {
   // actually register the form and inject the onSubmit event handler
   const registerForm: RegisterForm = useCallback(
     (options) => {
-      const onSubmitHandler: ReturnType<RegisterForm>["onSubmit"] = (e) => {
+      const onSubmitHandler: ReturnType<RegisterForm>["onSubmit"] = async (e) => {
         // execute validation, if any, and return it as the first argument
         options?.handleSubmit && options.handleSubmit(executeFormValidation(), e);
 

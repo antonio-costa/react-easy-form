@@ -4,14 +4,12 @@
 
 ### High Priority
 
-- Include field validators in general form validation function.
-- Transform all validation functions to accept asynchronous validators
-- Create `resetField()`, `resetForm()`, ~~`refreshDefaultValues()`~~ methods.
+- Create `resetField()`, `resetForm()`, ~~`syncDefaultValues()`~~ methods.
 
 ### Low Priority
 
 - Add default values for undefined default values for all input types (`button`, `color`, `date`, `datetime-local`, `email`, `file`, `hidden`, `image`, `month`, `password`, `reset`, `search`, `submit`, `tel`, `time`, `url`, `week`)
-- Add form inputMapper and outputMapper.
+- Add form inputMapper and outputMapper?
 - Add option to evaluate fields that were removed from the DOM (if they are not explicitly unregistered). How should `getValues()` handle this?
 - Add debug tools for `isDirty()` (console log all dirty fields)
 - Add debug tools for `setValue()` (to know from where it was called, if necessary)
@@ -20,6 +18,8 @@
 
 ### Done
 
+- ~~Include field validators in general form validation function.~~
+- ~~- Transform all validation functions to accept asynchronous validators~~
 - ~~Complete handleSubmit and executeSubmit functions. Maybe move handleSubmit to registerForm()?~~
 - ~~Add validator support onsubmit, onchange and onblur~~
 - ~~Make decision on how data should be handled (always nested keys or 1 level deep object) - see prop `flattenObject` on useGetValues.~~
@@ -30,11 +30,9 @@
 - ~~Change getValue and getValues to retrieve values from \_formState instead of the DOM. (Need to make sure that \_formState is always up to date)~~
 - ~~Add never dirty.~~
 
-## TODO: Add Unit Testing
+## How to use (TO DO)
 
-## How to use
-
-```tsx
+<!-- ```tsx
 import { useCallback } from "react";
 import { FormProvider } from "./FormContext";
 import { useForm } from "./useForm";
@@ -65,13 +63,16 @@ function App() {
     </FormProvider>
   );
 }
-```
+``` -->
 
 ## Available hooks
 
 - useForm(formName: string)
 - useFormContext()
 - useWatch()
+- useWatchValue()
+- useWatchError()
+- useWatchTouched()
 
 ## useForm(formName: string)
 

@@ -24,7 +24,7 @@ const emptyRef = <T,>(initialValue: T): React.MutableRefObject<T> => ({
   current: initialValue,
 });
 
-export const FormContext = createContext<FormContextValue>({
+const defaultFormContextValue: FormContextValue = {
   fieldValues: emptyObservable<FormFieldValues>({}),
   formId: "",
   getValue: () => undefined,
@@ -33,10 +33,12 @@ export const FormContext = createContext<FormContextValue>({
   registerForm: () => ({ id: "", onSubmit: () => null }),
   executeSubmit: () => null,
   isDirty: () => false,
+  syncDefaultValues: () => null,
   isTouched: () => false,
   setValue: () => null,
   unregister: () => null,
   clearErrors: () => null,
+  getError: () => undefined,
   setError: () => null,
   _formState: {
     formId: "",
@@ -50,14 +52,17 @@ export const FormContext = createContext<FormContextValue>({
     fieldsNeverDirty: emptyRef<FieldsNeverDirty>([]),
     formErrors: emptyObservable<FormErrors>({}),
     defaultValues: emptyRef<Record<string, FieldValuePrimitive>>({}),
-    optionsRef: emptyRef<UseFormOptions | undefined>(undefined),
+    optionsRef: emptyRef<UseFormOptions>({}),
     fieldsExternallySet: emptyRef<FieldsExternallySet>([]),
     fieldsRegisterOptions: emptyRef<FieldsRegisterOptions>({}),
   },
-});
+};
+
+export const FormContext = createContext<FormContextValue>(defaultFormContextValue);
 
 export const useFormContext = (formCtx?: FormContextValue) => {
   const closestCtx = useContext(FormContext);
+
   return formCtx || closestCtx;
 };
 
