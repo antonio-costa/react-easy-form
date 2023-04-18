@@ -1,45 +1,33 @@
 import { useCallback, useMemo } from "react";
-import { FormId, FormInternalState, FormValidation } from "../useForm";
-import { useGetValues } from "./useGetValues";
+import { FormInternalState, FormValidation } from "../useForm";
+import { useValidateForm } from "./useValidateForm";
 
-export type ExecuteSubmit = (handleExecuteSubmit: (validation: FormValidation) => void) => void;
-export type FormHandleSubmit = (validation: FormValidation, e: React.FormEvent<HTMLFormElement>) => void;
+export type FormHandleSubmit = (validation: Promise<FormValidation>, e?: React.FormEvent<HTMLFormElement>) => void;
+export type ExecuteSubmit = (handleExecuteSubmit: FormHandleSubmit) => void;
 export type RegisterFormOptions = { handleSubmit?: FormHandleSubmit };
 export type UseRegisterForm = (formState: FormInternalState) => { registerForm: RegisterForm; executeSubmit: ExecuteSubmit };
 export type RegisterForm = (options?: RegisterFormOptions) => {
-  id: FormId;
-  onSubmit: React.DOMAttributes<HTMLFormElement>["onSubmit"];
+  onSubmit?: React.DOMAttributes<HTMLFormElement>["onSubmit"];
 };
 
 export const useRegisterForm: UseRegisterForm = (formState) => {
-  const getValues = useGetValues(formState);
-  const { formId, optionsRef } = formState;
-
-  // executes the form validation
-  const executeFormValidation = useCallback((): FormValidation => {
-    if (!optionsRef?.current?.validator) return { valid: true, errors: {} };
-    const validation = optionsRef.current.validator(
-      getValues(undefined, { flattenObject: optionsRef.current.validation?.flattenObject })
-    );
-    formState.formErrors.setValue(validation.errors);
-
-    return validation;
-  }, [formState.formErrors, getValues, optionsRef]);
+  const validateForm = useValidateForm(formState);
+  const { formId } = formState;
 
   // helper function if you want to submit a form outside the HTML native cycle
   const executeSubmit: ExecuteSubmit = useCallback(
-    (handleExecuteSubmit) => {
-      handleExecuteSubmit(executeFormValidation());
+    async (handleExecuteSubmit) => {
+      handleExecuteSubmit(validateForm());
     },
-    [executeFormValidation]
+    [validateForm]
   );
 
   // actually register the form and inject the onSubmit event handler
   const registerForm: RegisterForm = useCallback(
     (options) => {
-      const onSubmitHandler: ReturnType<RegisterForm>["onSubmit"] = (e) => {
+      const onSubmitHandler: ReturnType<RegisterForm>["onSubmit"] = async (e) => {
         // execute validation, if any, and return it as the first argument
-        options?.handleSubmit && options.handleSubmit(executeFormValidation(), e);
+        options?.handleSubmit && options.handleSubmit(validateForm(), e);
 
         // prevent default and return false to avoid native form submission
         // Should this be done on through options?.handleSubmit() instead?
@@ -49,7 +37,7 @@ export const useRegisterForm: UseRegisterForm = (formState) => {
 
       return { id: formId, onSubmit: onSubmitHandler };
     },
-    [executeFormValidation, formId]
+    [formId, validateForm]
   );
 
   return useMemo(

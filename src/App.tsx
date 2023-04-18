@@ -1,348 +1,143 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { CustomFieldController } from "./CustomFieldController";
-import { MultiselectInputWithForm } from "./customFieldsExamples/multiselect";
-import { FormProvider, useFormContext } from "./FormContext";
-import { FormErrors, FormValidation, FormValidator, useForm } from "./useForm";
-import { useWatch } from "./useWatch";
+import { useCallback } from "react";
+import { CustomInput } from "../__tests__/helpers/CustomInput";
+import { FormProvider } from "./FormContext";
+import { FormHandleSubmit } from "./formMethodsHooks";
+import { FormErrors, FormValidator, useForm } from "./useForm";
+import { shallowEqual } from "./util/misc";
+import { useWatchError } from "./watchers/useWatchError";
+import { useWatchValue } from "./watchers/useWatchValue";
 
-const validator1: FormValidator = (data) => {
-  const errors: FormErrors = {};
-
-  const validationString = "validated-user";
-  if ((data?.person as any)?.username !== validationString) {
-    errors["person.username"] = `Username must be equal to '${validationString}'.`;
-  }
-
-  if (
-    !(
-      Array.isArray(data?.["select-cenas"]) &&
-      (data?.["select-cenas"] as string[]).length === 2 &&
-      (data?.["select-cenas"] as string[]).every((v) => ["strawberry", "vanilla"].includes(v))
-    )
-  ) {
-    errors["select-cenas"] = `Select Strawberry and Vanilla.`;
-  }
-
-  return {
-    valid: Boolean(!Object.keys(errors).length),
-    errors,
-  };
+const defaultValues = {
+  "test-custom": ["wow"],
+  "test-text": "test default value",
+  "test-checkbox": true,
+  "test-radio": "lancia",
+  "test-select": "cat",
+  "test-select-multiple": ["horse", "cat"],
 };
 
-const validator2: FormValidator = (data) => {
-  const errors: FormErrors = {};
-  Object.keys(data).forEach((fName) => {
-    if (fName.startsWith("stress.")) errors[fName] = `Error on ${fName}`;
-    if (fName.startsWith("contentEditable-fieldname")) errors[fName] = `Error on ${fName}`;
-    if (fName.startsWith("select-cenas")) errors[fName] = `Error on ${fName}`;
+const validator: FormValidator = async (data) => {
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(null);
+    }, 1000);
   });
 
+  const errors = Object.entries(data).reduce<FormErrors>((prev, [fname, fvalue]) => {
+    if (!shallowEqual(fvalue, (defaultValues as any)[fname])) {
+      prev[fname] = `DIFFERENT VALUE FROM DEFAULT (${fvalue})`;
+    }
+    return prev;
+  }, {});
+
   return {
-    valid: Boolean(Object.keys(errors)),
+    valid: Object.keys(errors).length > 0,
     errors,
   };
 };
 
 function App() {
-  const [validator, setValidator] = useState<FormValidator>(() => validator1);
   const form = useForm("personal-details", {
     validator,
-    validation: { method: "onchange", flattenObject: true },
+    validation: {
+      method: "onblur",
+    },
   });
 
-  const onSubmit = useCallback(
-    (validation: FormValidation /* , e: React.FormEvent<HTMLFormElement> */) => {
-      console.log("TEST SUBMIT", validation, form.getValues());
+  const onSubmit = useCallback<FormHandleSubmit>(
+    async (validation, e) => {
+      console.log("TEST SUBMIT", await validation, form.getValues(), e);
     },
     [form]
   );
+  const values = useWatchValue(undefined, { formContext: form });
+  const errors = useWatchError(undefined, { formContext: form });
 
-  const { value: personValues, error: personErrors } = useWatch("person.", { watchErrors: true, formContext: form });
-  const { value: password, error: passwordError } = useWatch("password", { watchErrors: true, formContext: form });
-
-  const { value: customFieldValue, error: customFieldError } = useWatch("contentEditable-fieldname", {
-    watchErrors: true,
-    formContext: form,
-  });
-
-  const { error: multiselectError } = useWatch("select-cenas", {
-    watchValues: false,
-    watchErrors: true,
-    formContext: form,
-  });
-  useEffect(() => {
-    console.log("multiselectError", multiselectError);
-  }, [multiselectError]);
   return (
     <div className="App">
       <FormProvider value={form}>
         <form {...form.registerForm({ handleSubmit: onSubmit })}>
-          <fieldset>
-            <label>Username ({personValues?.["person.username"]})</label>
-            <input type="text" {...form.register("person.username")} defaultValue="wow" autoComplete="username" />
-            <ErrorDiv error={personErrors?.["person.username"]} />
-          </fieldset>
-          <fieldset>
-            <label>Password</label>
-            <input
-              type="password"
-              {...form.register("password", {
-                validator: (value) => (value === "verysafe" ? null : "password must be 'verysafe'."),
-              })}
-              autoComplete="current-password"
-            />
-            {password ? `very safe: ${password}` : null}
-            <ErrorDiv error={passwordError} />
-          </fieldset>
-          <fieldset>
+          <div style={{ margin: 12 }}>
             <div>
-              <label htmlFor="male">Male</label>
-              <input type="radio" {...form.register("person.gender")} value="male" defaultChecked id="male" />
+              <CustomInput {...(form.register("test-custom") as any)} defaultValue={defaultValues["test-custom"]} />
             </div>
             <div>
-              <label htmlFor="female">Female</label>
-              <input type="radio" {...form.register("person.gender")} value="female" id="female" />
+              <input
+                type="text"
+                {...form.register("test-text", {
+                  validator: async (v, formdata) => {
+                    return (v as string).length > 0 ? null : "custom validator error";
+                  },
+                })}
+                defaultValue={defaultValues["test-text"]}
+              />
             </div>
             <div>
-              <label htmlFor="other">Other</label>
-              <input type="radio" {...form.register("person.gender")} value="other" id="other" />
+              <input type="checkbox" {...form.register("test-checkbox")} defaultChecked={defaultValues["test-checkbox"]} />
             </div>
-          </fieldset>
-          <button
-            type="button"
-            onClick={() => {
-              console.log("description dirty?", form.isDirty("description"));
-              console.log("select-cenas dirty?", form.isDirty("select-cenas"));
-              console.log("form dirty?", form.isDirty());
-            }}
-          >
-            is dirty debug?
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              form.clearErrors();
-              setValidator((old: any) => (old === validator1 ? validator2 : validator1));
-            }}
-          >
-            change validator
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              form.setError("password", "password is invalid for no reason.");
-            }}
-          >
-            set password error
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              form.clearErrors(["person.username"]);
-            }}
-          >
-            clear username error
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              form.clearErrors();
-            }}
-          >
-            clear all errors
-          </button>
-          <fieldset>
-            <label>Height</label>
-            <input type="range" {...form.register("person.details.height")} min={50} max={250} />
-          </fieldset>
-          <fieldset>
-            <label>Age</label>
-            <input type="number" {...form.register("person.details.age")} min={1} max={150} />
-          </fieldset>
-          <fieldset>
-            <label>Receive SPAM</label>
-            <input type="checkbox" {...form.register("spam")} value="spam" />
-          </fieldset>
-          <fieldset>
-            <label htmlFor="pet-select">Choose a pet:</label>
-            <select {...form.register("pets", { defaultSelectOption: "hamster" })} id="pet-select">
-              <option value="">--Please choose an option--</option>
-              <option value="dog">Dog</option>
-              <option value="cat">Cat</option>
-              <option value="hamster">Hamster</option>
-              <option value="parrot">Parrot</option>
-              <option value="spider">Spider</option>
-              <option value="goldfish">Goldfish</option>
-            </select>
-          </fieldset>
-          <fieldset>
-            <label htmlFor="car-select">Choose a car:</label>
-            <select multiple {...form.register("cars", { defaultSelectOption: ["bmw", "fiat"] })} id="car-select">
-              <option value="">--Please choose an option--</option>
-              <option value="bmw">BMW</option>
-              <option value="fiat">Fiat</option>
-              <option value="mercedes">Mercedes</option>
-              <option value="lancia">Lancia</option>
-            </select>
-          </fieldset>
-          <MultiselectInputWithForm name="multiselect-custom" defaultValue={["test"]} />
+            <div>
+              <input
+                type="radio"
+                {...form.register("test-radio")}
+                defaultChecked={defaultValues["test-radio"] === "bmw"}
+                value="bmw"
+              />
+            </div>
+            <div>
+              <input
+                type="radio"
+                {...form.register("test-radio")}
+                defaultChecked={defaultValues["test-radio"] === "lancia"}
+                value="lancia"
+              />
+            </div>
+            <div>
+              <input
+                type="radio"
+                {...form.register("test-radio")}
+                defaultChecked={defaultValues["test-radio"] === "mercedes"}
+                value="mercedes"
+              />
+            </div>
+            <div>
+              <select {...form.register("test-select", { defaultSelectOption: defaultValues["test-select"] })}>
+                <option value="dog">Dog</option>
+                <option value="horse">Horse</option>
+                <option value="cat">Cat</option>
+              </select>
+            </div>
 
-          <ContentEditableField name="contentEditable-fieldname" defaultValue="def value!" />
-          <p>Value: {customFieldValue}</p>
-          <ErrorDiv error={customFieldError} />
-          <button type="submit">Submit form</button>
-          <ToggleableTextArea defVal={"wow"} />
-          <button
-            type="button"
-            onClick={() => {
-              form.setValue("multiselect-custom", ["wow bro, you set a custom value", "two"]);
-              form.setValue("select-cenas", ["strawberry"]);
-              form.setValue("spam", true);
-              console.log("form._formState.fieldValues", form._formState.fieldValues.current);
-              console.log("form.getValues()", form.getValues());
-            }}
-          >
-            debug
-          </button>
-          <ErrorDiv error={multiselectError} />
-          <StressValues />
-          {
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 100px)" }}>
-              {Array.from({ length: 1000 }, (_, i) => (
-                <StressTestInput name={`test-${i}`} key={i} />
-              ))}
+            <div>
+              <select
+                {...form.register("test-select-multiple", { defaultSelectOption: defaultValues["test-select-multiple"] })}
+                multiple
+              >
+                <option value="dog">Dog</option>
+                <option value="horse">Horse</option>
+                <option value="cat">Cat</option>
+                <option value="cow">Cow</option>
+              </select>
             </div>
-          }
+          </div>
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
+            <button>Submit native</button>
+            <button
+              type="button"
+              onClick={() => {
+                form.executeSubmit(onSubmit);
+              }}
+            >
+              ExecuteSubmit
+            </button>
+          </div>
         </form>
       </FormProvider>
+      <h3>Errors</h3>
+      <pre>{JSON.stringify(errors, null, 2)}</pre>
+      <h3>Values</h3>
+      <pre>{JSON.stringify(values, null, 2)}</pre>
     </div>
   );
 }
-
-const ContentEditableField = ({ name, defaultValue }: { name: string; defaultValue?: string }) => {
-  const divRef = useRef<HTMLDivElement | null>();
-
-  const defaultValueSet = useRef<boolean>(false);
-
-  useEffect(() => {
-    if (!divRef.current || defaultValueSet.current) return;
-    defaultValueSet.current = true;
-    divRef.current.innerText = String(defaultValue);
-  }, [defaultValue]);
-
-  return (
-    <CustomFieldController
-      name={name}
-      onSetValue={(value) => {
-        if (!divRef.current) return;
-        divRef.current.innerText = String(value);
-      }}
-      defaultValue={defaultValue || ""}
-    >
-      {({ triggerChange, triggerBlur, ref }) => (
-        <fieldset>
-          <div
-            style={{ border: "2px dashed pink", borderRadius: 4, padding: 4, width: 200, height: 20 }}
-            contentEditable
-            onInput={(e) => {
-              triggerChange({ name, value: e.currentTarget.innerText });
-            }}
-            onBlur={() => {
-              triggerBlur({ name });
-            }}
-            ref={(r) => {
-              ref(r);
-              divRef.current = r;
-            }}
-          ></div>
-        </fieldset>
-      )}
-    </CustomFieldController>
-  );
-};
-const ErrorDiv = ({ error }: { error: string }) => {
-  return error ? <div style={{ color: "red" }}>{error}</div> : null;
-};
-const StressTestInput = memo(({ name }: { name: string }) => {
-  const { value, error } = useWatch(`stress.${name}`, { watchValues: true, watchErrors: true });
-
-  return (
-    <div>
-      {`stress.${name}`} {`(${value})`}
-      <ContentEditableField name={`stress.${name}`} defaultValue={`stress.${name}`} />
-      <div>{error || ""}</div>
-    </div>
-  );
-});
-
-/* <fieldset>
-      <label>
-        {`stress.${name}`} {`(${value})`}
-      </label>
-      <input
-        style={{ width: 80 }}
-        {...form.register(`stress.${name}`)}
-        type="text"
-        // defaultValue={!name.includes("-1") ? `def ${name}` : undefined}
-      />
-      {error || ""}
-    </fieldset> */
-
-StressTestInput.displayName = "StressTestInput";
-const StressValues = () => {
-  const [visible, setVisible] = useState(true);
-  const { value: stressValues } = useWatch("stress.");
-  return (
-    <div>
-      stress values (undefined is converted to null for visualization purposes)
-      <button onClick={() => setVisible((old) => !old)} type="button">
-        hide
-      </button>
-      {visible ? <pre>{JSON.stringify(stressValues, (k, v) => (v === undefined ? null : v), 2)}</pre> : null}
-    </div>
-  );
-};
-const ToggleableTextArea = memo(({ defVal }: { defVal: string }) => {
-  const form = useFormContext();
-  const [visible, setVisible] = useState(true);
-
-  const onClick = () => {
-    setVisible((old) => {
-      if (old) {
-        // form.unregister("description");
-        return false;
-      }
-      return true;
-    });
-  };
-
-  const { value: description } = useWatch("description");
-
-  return (
-    <div>
-      {visible ? (
-        <fieldset>
-          <label>Description {description}</label>
-          <textarea {...form.register("description")} defaultValue={defVal} />
-        </fieldset>
-      ) : null}
-      <br />
-      Value description: {description}
-      <br />
-      <button type="button" onClick={onClick}>
-        Hide/show textarea
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          form.setValue("description", "AAAA");
-        }}
-      >
-        change description value to &quot;AAAA&quot;
-      </button>
-    </div>
-  );
-});
-ToggleableTextArea.displayName = "ToggleableTextArea";
 
 export default App;

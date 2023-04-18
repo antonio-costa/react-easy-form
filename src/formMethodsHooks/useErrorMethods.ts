@@ -1,36 +1,53 @@
 import { useCallback, useMemo } from "react";
 import { FieldError, FormInternalState } from "../useForm";
 
-export type SetFieldError = (fieldName: string, error: FieldError | null) => void;
-export type ClearFieldErrors = (fieldNameOrFieldNames: string[]) => void;
+export type SetFieldError = (fieldName: string, error: FieldError) => void;
+export type ClearFieldsErrors = (fieldNames?: string | string[]) => void;
+export type GetFieldError = (fieldName: string) => FieldError;
 
 export type FormErrorMethods = {
   setError: SetFieldError;
-  clearErrors: ClearFieldErrors;
+  clearErrors: ClearFieldsErrors;
+  getError: GetFieldError;
 };
 export type UseFormErrorMethods = (formState: FormInternalState) => FormErrorMethods;
 
 export const useErrorMethods: UseFormErrorMethods = (formState) => {
+  const { fieldsNames, optionsRef, formErrors } = formState;
   const setError = useCallback<SetFieldError>(
     (fieldName, error) => {
-      formState.formErrors.setValue(() => {
-        const r = { ...formState.formErrors.current };
+      if (optionsRef.current.debug?.logSetError?.includes(fieldName)) {
+        console.log("[FORMS-DEBUG] [logSetError] Tracing set error: ", fieldName);
+        console.log("[FORMS-DEBUG] [logSetError] New error value: ", error);
+        console.trace(fieldName);
+      }
+      formErrors.setValue(() => {
+        const r = { ...formErrors.current };
         if (error === null) {
           delete r[fieldName];
-        } else if (formState.fieldElements()[fieldName]) {
+        } else if (fieldsNames().includes(fieldName)) {
           r[fieldName] = error;
         }
         return r;
       }, [fieldName]);
     },
-    [formState]
+    [fieldsNames, formErrors, optionsRef]
   );
-  const clearErrors = useCallback<ClearFieldErrors>(
-    (fieldNames) => {
-      formState.formErrors.setValue(() => {
+  const clearErrors = useCallback<ClearFieldsErrors>(
+    (_fieldNames) => {
+      const fieldNames =
+        _fieldNames === undefined ? fieldsNames() : typeof _fieldNames === "string" ? [_fieldNames] : _fieldNames;
+
+      fieldNames.forEach((fieldName) => {
+        if (optionsRef.current.debug?.logSetError?.includes(fieldName)) {
+          console.log("[FORMS-DEBUG] [logSetError] Tracing clear error: ", fieldName);
+          console.trace(fieldName);
+        }
+      });
+      formErrors.setValue(() => {
         if (!fieldNames) return {};
 
-        const n = { ...formState.formErrors.current };
+        const n = { ...formErrors.current };
 
         fieldNames.forEach((fName) => {
           delete n[fName];
@@ -39,8 +56,15 @@ export const useErrorMethods: UseFormErrorMethods = (formState) => {
         return n;
       }, fieldNames);
     },
+    [fieldsNames, formErrors, optionsRef]
+  );
+
+  const getError = useCallback<GetFieldError>(
+    (fieldName) => {
+      return formState.formErrors.current?.[fieldName];
+    },
     [formState.formErrors]
   );
 
-  return useMemo(() => ({ setError, clearErrors }), [clearErrors, setError]);
+  return useMemo(() => ({ setError, clearErrors, getError }), [setError, clearErrors, getError]);
 };

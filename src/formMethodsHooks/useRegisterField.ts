@@ -1,42 +1,57 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { FieldValidator, FieldValue, FormInternalState, FormNativeFieldElement } from "../useForm";
-import {
-  isCheckboxField,
-  isRadioField,
-  isRangeField,
-  isSelectField,
-  isValidField,
-  typifyFieldValue,
-} from "../util/getFieldValue";
+import { isCheckboxField, isRadioField, isSelectField, typifyFieldValue } from "../util/getFieldValue";
 import { getNestedValue, nestedKeyExists, setNestedValue } from "../util/misc";
-import { useGetValue } from "./useGetValue";
-import { useGetValues } from "./useGetValues";
+import { useSyncNativeDefaultValue } from "./useSyncNativeDefaultValue";
+import { useTouchField } from "./useTouchField";
+import { useTriggerValidation } from "./useTriggerValidation";
+import { useUpdateExternallySet } from "./useUpdateExternallySet";
 
-export type RegisterFieldOptions = {
+export type RegisterFieldOptions<T = FormNativeFieldElement> = {
   defaultSelectOption?: string | string[];
-  // radioValue?: string;
-  onChange?: React.ChangeEventHandler<FormNativeFieldElement>;
-  onBlur?: React.FocusEventHandler<FormNativeFieldElement>;
+  onChange?: React.ChangeEventHandler<T>;
+  onBlur?: React.FocusEventHandler<T>;
   validator?: FieldValidator;
+  neverDirty?: boolean;
+  validationDeps?: string[];
 };
-export type RegisterFieldValue = {
+
+export type RegisterFieldValue<T = FormNativeFieldElement> = {
   name: string;
   ref: any;
   value?: string;
-  onChange: React.ChangeEventHandler<FormNativeFieldElement> | undefined;
-  onBlur: React.FocusEventHandler<FormNativeFieldElement> | undefined;
+  onChange: React.ChangeEventHandler<T> | undefined;
+  onBlur: React.FocusEventHandler<T> | undefined;
+  id?: string;
 };
-export type RegisterField = (name: string, options?: RegisterFieldOptions) => RegisterFieldValue;
+
+export type RegisterField = <T extends FormNativeFieldElement = FormNativeFieldElement>(
+  name: string,
+  options?: RegisterFieldOptions<T>
+) => RegisterFieldValue<T>;
 
 export type UseRegisterField = (formState: FormInternalState) => RegisterField;
+
 export const useRegisterField: UseRegisterField = (formState) => {
-  const { nativeFieldElements, defaultValues, fieldValues } = formState;
-  const getValue = useGetValue(formState);
-  const getValues = useGetValues(formState);
+  const {
+    nativeFieldElements,
+    defaultValues,
+    fieldValues,
+    fieldsRegisterOptions,
+    fieldsDOMSyncing,
+    fieldsValidationDependencies,
+  } = formState;
+
+  const touchField = useTouchField(formState);
+  const updateExternallySet = useUpdateExternallySet(formState);
+  const syncNativeDefaultValue = useSyncNativeDefaultValue(formState);
+  const triggerValidation = useTriggerValidation(formState);
 
   const unregisterRef = useCallback(
     (name: string) => {
       // remove element from fieldElements
+      if (!(name in nativeFieldElements.current)) return;
+
       nativeFieldElements.setValue((old) => {
         if (old[name]) {
           old[name] = old[name].filter((oldEl) => {
@@ -47,6 +62,7 @@ export const useRegisterField: UseRegisterField = (formState) => {
         return old;
       });
     },
+
     [nativeFieldElements]
   );
 
@@ -59,72 +75,24 @@ export const useRegisterField: UseRegisterField = (formState) => {
 
       const field = nativeFieldElements.current[name];
 
-      if (!field) {
+      if (!field || (field[0].type === "radio" && !field.some((el) => el.value === ref.value))) {
         nativeFieldElements.setValue((old) => {
           old[name] = [...(old[name] || []), ref];
           return old;
         });
       }
 
-      // set value
-      const newValue = getValue(name);
-      if (getNestedValue(fieldValues.current, name) !== newValue) {
-        fieldValues.setValue(
-          (old) => {
-            return setNestedValue<FieldValue>(old, name, newValue);
-          },
-          [name]
-        );
+      // update register options
+      if (registerOptions) {
+        fieldsRegisterOptions.current[name] = registerOptions;
       }
 
       // default values are used to test if field is dirty
       // if the default value is updated, the first value
       // will always be used unless the component was manually
       // unregistered (through form.unregister() function)
-      if (!(name in defaultValues.current)) {
-        if (isCheckboxField([ref])) {
-          defaultValues.current[name] = (ref as HTMLInputElement).defaultChecked;
-        } else if (isRadioField([ref])) {
-          if ((ref as HTMLInputElement).defaultChecked) {
-            defaultValues.current[name] = (ref as HTMLInputElement).value;
-          }
-        } else if (isSelectField([ref])) {
-          if (registerOptions?.defaultSelectOption !== undefined) {
-            // default value for select is a special case
-            // and needs to be defined here.
-            // React uses "defaultValue" prop on the <select /> but that prop
-            // does not exist on the DOM itself
-            if ((ref as HTMLSelectElement).multiple) {
-              if (!Array.isArray(registerOptions.defaultSelectOption)) {
-                throw new Error(
-                  "[react-hook-forms] Default value for a multiple <select /> input must be of type string[]."
-                );
-              }
-              Array.from(ref.querySelectorAll("option")).forEach((option) => {
-                if (registerOptions.defaultSelectOption?.includes(option.value)) {
-                  option.selected = true;
-                } else {
-                  option.selected = false;
-                }
-              });
-            } else {
-              if (typeof registerOptions.defaultSelectOption !== "string") {
-                throw new Error(
-                  "[react-hook-forms] Default value for a non-multiple <select /> input must be of type string."
-                );
-              }
-              ref.value = registerOptions.defaultSelectOption;
-            }
-            defaultValues.current[name] = registerOptions.defaultSelectOption;
-          }
-        } else if (isRangeField([ref])) {
-          const max = Number((ref as HTMLInputElement).max) || 100;
-          const min = Number((ref as HTMLInputElement).min) || 0;
-          defaultValues.current[name] = Math.round((min + max) / 2);
-        } else if (isValidField([ref])) {
-          const typedRef = ref as Exclude<FormNativeFieldElement, HTMLSelectElement>;
-          defaultValues.current[name] = typifyFieldValue(typedRef.defaultValue, typedRef.type);
-        }
+      if (!(name in defaultValues.current) || (defaultValues.current[name] === undefined && isRadioField([ref]))) {
+        syncNativeDefaultValue(ref);
       }
 
       // set the default field values
@@ -135,55 +103,37 @@ export const useRegisterField: UseRegisterField = (formState) => {
           formState.defaultValues.current[name] !== undefined)
       ) {
         formState.fieldValues.setValue(
-          (old) => {
-            const defaultValueDefined = name in formState.defaultValues.current;
-            return setNestedValue<FieldValue>(
-              old,
-              name,
-              defaultValueDefined ? formState.defaultValues.current[name] : undefined
-            );
-          },
+          setNestedValue<FieldValue>(formState.fieldValues.current, name, formState.defaultValues.current[name]),
           [name]
         );
       }
+
+      // add validation dependencies
+      fieldsValidationDependencies.current.set(name, new Set(registerOptions?.validationDeps || []));
     },
     [
       defaultValues,
-      nativeFieldElements,
-      fieldValues,
+      fieldsRegisterOptions,
+      fieldsValidationDependencies,
       formState.defaultValues,
       formState.fieldValues,
       formState.fieldsTouched,
-      getValue,
+      nativeFieldElements,
+      syncNativeDefaultValue,
       unregisterRef,
     ]
   );
-  const triggerValidation = useCallback(
-    (fielName: string, fieldValidator?: FieldValidator) => {
-      // field validator
-      const fieldErrorMessage = fieldValidator && fieldValidator(getValue(fielName), getValues());
-      if (fieldErrorMessage) {
-        return formState.formErrors.setValue({ ...formState.formErrors.current, [fielName]: fieldErrorMessage }, [fielName]);
-      }
-
-      // form validator
-      if (!formState?.optionsRef?.current?.validator) return;
-      const validation = formState?.optionsRef.current.validator(getValues(fielName));
-
-      if (formState.formErrors.current[fielName] !== validation.errors[fielName]) {
-        formState.formErrors.setValue({ ...formState.formErrors.current, [fielName]: validation.errors[fielName] }, [
-          fielName,
-        ]);
-      }
-    },
-    [formState.formErrors, formState?.optionsRef, getValue, getValues]
-  );
 
   const onChange = useCallback(
-    (e: React.ChangeEvent<FormNativeFieldElement>, fieldValidator?: FieldValidator) => {
+    (e: React.ChangeEvent<FormNativeFieldElement>, name: string) => {
+      const onChangeFn = fieldsOptions.current?.[name]?.onChange;
+
+      if (!fieldsDOMSyncing.current.has(name)) {
+        onChangeFn && onChangeFn(e as React.ChangeEvent<FormNativeFieldElement>);
+      }
+
       fieldValues.setValue(
         (old) => {
-          const name = e.currentTarget.name;
           const value = (() => {
             const field = [e.currentTarget];
             if (isCheckboxField(field)) {
@@ -192,68 +142,96 @@ export const useRegisterField: UseRegisterField = (formState) => {
             if (isRadioField(field) && (field[0] as HTMLInputElement).checked) {
               return (e.currentTarget as HTMLInputElement).value;
             }
+            if (isSelectField(field) && (field[0] as HTMLSelectElement).multiple) {
+              const typedEl = field[0] as HTMLSelectElement;
+              const optionsEls = Array.from(typedEl.querySelectorAll<HTMLOptionElement>("option:checked"));
+              return optionsEls.map((o) => o.value);
+            }
             return typifyFieldValue(field[0].value, field[0].type);
           })();
+
           return setNestedValue(old, name, value);
         },
-        [e.currentTarget.name]
+        [name]
       );
 
+      updateExternallySet(name, false);
+
       if (formState.optionsRef.current?.validation?.method === "onchange") {
-        triggerValidation(e.currentTarget.name, fieldValidator);
+        triggerValidation(name);
       }
 
       // touch field if not already
-      if (formState.fieldsTouched.current.includes(e.currentTarget.name)) {
-        formState.fieldsTouched.setValue(
-          (old) => {
-            old.push(e.currentTarget.name);
-            return old;
-          },
-          [e.currentTarget.name]
-        );
+      touchField(name);
+
+      if (fieldsDOMSyncing.current.has(name)) {
+        fieldsDOMSyncing.current.delete(name);
       }
     },
-    [fieldValues, formState.fieldsTouched, formState.optionsRef, triggerValidation]
+    [fieldValues, fieldsDOMSyncing, formState.optionsRef, touchField, triggerValidation, updateExternallySet]
   );
 
   const onBlur = useCallback(
-    (e: React.FocusEvent<FormNativeFieldElement>, fieldValidator?: FieldValidator) => {
+    (e: React.FocusEvent<FormNativeFieldElement>, name: string) => {
+      const onBlurFn = fieldsOptions.current?.[name]?.onBlur;
+      onBlurFn && onBlurFn(e as React.FocusEvent<FormNativeFieldElement>);
+
       if (["onchange", "onblur"].includes(formState.optionsRef.current?.validation?.method || "")) {
-        triggerValidation(e.currentTarget.name, fieldValidator);
+        triggerValidation(name);
       }
 
       // touch field if not already
-      if (formState.fieldsTouched.current.includes(e.currentTarget.name)) {
-        formState.fieldsTouched.setValue(
-          (old) => {
-            old.push(e.currentTarget.name);
-            return old;
-          },
-          [e.currentTarget.name]
-        );
-      }
+      touchField(name);
     },
-    [formState.fieldsTouched, formState.optionsRef, triggerValidation]
+    [formState.optionsRef, touchField, triggerValidation]
+  );
+  const fieldsOptions = useRef<Record<string, RegisterFieldOptions<FormNativeFieldElement>>>({});
+  const fieldsProps = useRef<Record<string, RegisterFieldValue<FormNativeFieldElement>>>({});
+
+  const _ref = useCallback(
+    (ref: FormNativeFieldElement | null, name: string) => {
+      const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+
+      if (fieldsOptions.current[name]?.neverDirty && neverDirtyIndex === -1) {
+        formState.fieldsNeverDirty.current.push(name);
+      } else if (!fieldsOptions.current[name]?.neverDirty && neverDirtyIndex !== -1) {
+        formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+      }
+
+      registerRef(ref, name, fieldsOptions.current[name]);
+    },
+    [formState.fieldsNeverDirty, registerRef]
+  );
+
+  const _onChange = useCallback(
+    (e: any, name: string) => {
+      onChange(e as React.ChangeEvent<FormNativeFieldElement>, name);
+    },
+    [onChange]
+  );
+
+  const _onBlur = useCallback(
+    (e: any, name: string) => {
+      onBlur(e as React.FocusEvent<FormNativeFieldElement>, name);
+    },
+    [onBlur]
   );
 
   return useCallback(
-    (name, options) => {
-      const r: RegisterFieldValue = {
-        name,
-        ref: (ref: FormNativeFieldElement | null) => registerRef(ref, name, options),
-        onChange: (e) => {
-          options?.onChange && options?.onChange(e);
-          onChange(e, options?.validator);
-        },
-        onBlur: (e) => {
-          options?.onBlur && options?.onBlur(e);
-          onBlur(e, options?.validator);
-        },
-      };
+    (name, _options) => {
+      fieldsOptions.current[name] = (_options || {}) as RegisterFieldOptions<FormNativeFieldElement>;
+      if (!fieldsProps.current[name]) {
+        fieldsProps.current[name] = {
+          name,
+          ref: (r: any) => _ref(r, name),
+          onChange: (e) => _onChange(e, name),
+          onBlur: (e) => _onBlur(e, name),
+          id: `${formState.formId}-fld-${name}`,
+        };
+      }
 
-      return r;
+      return fieldsProps.current[name];
     },
-    [onBlur, onChange, registerRef]
+    [_onBlur, _onChange, _ref, formState.formId]
   );
 };

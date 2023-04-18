@@ -1,37 +1,51 @@
 import { useCallback } from "react";
 import { FormInternalState } from "../useForm";
-import { deleteNestedValue } from "../util/misc";
+import { deleteNestedKey, toArray } from "../util/misc";
 
-export type UnregisterField = (name: string) => void;
+export type UnregisterField = (fieldNames?: string | string[]) => void;
 
 export const useUnregisterField = (formState: FormInternalState): UnregisterField => {
-  const { fieldValues, formErrors, defaultValues, fieldsTouched } = formState;
+  const { fieldValues, formErrors, defaultValues, fieldsTouched, fieldsValidationDependencies } = formState;
 
   return useCallback(
-    (name) => {
-      // remove value from list of fieldValues
-      fieldValues.setValue(
-        (old) => {
-          delete old[name];
-          return deleteNestedValue(old, name);
-        },
-        [name]
-      );
-      // remove value from list of defaultValues
-      if (defaultValues.current[name]) delete defaultValues.current[name];
+    (_fieldNames) => {
+      const fieldNames = toArray(_fieldNames);
+      fieldNames.forEach((name) => {
+        if (!name) return;
 
-      // remove error from fieldErrors
-      formErrors.setValue(
-        (old) => {
-          delete old[name];
-          return { ...old };
-        },
-        [name]
-      );
+        // remove value from list of fieldValues
+        fieldValues.setValue(
+          (old) => {
+            delete old[name];
+            return deleteNestedKey(old, name, true);
+          },
+          [name]
+        );
+        // remove value from list of defaultValues
+        if (defaultValues.current[name]) delete defaultValues.current[name];
 
-      // remove from touched
-      fieldsTouched.setValue((old) => old.filter((fname) => fname !== name), [name]);
+        // remove error from fieldErrors
+        formErrors.setValue(
+          (old) => {
+            delete old[name];
+            return old;
+          },
+          [name]
+        );
+
+        // remove from touched
+        fieldsTouched.setValue((old) => old.filter((fname) => fname !== name), [name]);
+
+        // remove from dirty
+        const neverDirtyIndex = formState.fieldsNeverDirty.current.findIndex((fname) => fname === name);
+        if (neverDirtyIndex !== -1) {
+          formState.fieldsNeverDirty.current.splice(neverDirtyIndex, 1);
+        }
+
+        // remove field validation depencies
+        fieldsValidationDependencies.current.delete(name);
+      });
     },
-    [defaultValues, fieldValues, fieldsTouched, formErrors]
+    [defaultValues, fieldValues, fieldsTouched, fieldsValidationDependencies, formErrors, formState.fieldsNeverDirty]
   );
 };

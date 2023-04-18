@@ -3,5 +3,5 @@ export default {
   transform: {
     "^.+\\.tsx?$": "ts-jest",
   },
-  testRegex: "(\\.|/)(test|spec)\\.[jt]sx?$",
+  testMatch: ["**/?(*.)+(spec|test).(ts|tsx)"],
 };

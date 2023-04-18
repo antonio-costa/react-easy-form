@@ -1,54 +1,106 @@
-import { render, renderHook, waitFor } from "@testing-library/react";
-import React from "react";
+import "@testing-library/jest-dom/extend-expect";
+import { render, renderHook } from "@testing-library/react";
 import { useForm } from "../src/useForm";
-import FormWithInputs, { DefaultValuesPerInputType } from "./components/FormWithInputs";
+import { CustomInputProps } from "./helpers/CustomInput";
+import { TestInput } from "./helpers/TextInput";
+import { CheckboxProps, InputType, defaultInputsProps, setupFormHook, validDefaultValues } from "./helpers/misc";
 
-describe("Undefined default values are properly typed", () => {
-  const unassignedDefaultValues: DefaultValuesPerInputType = {
-    text: "",
-    number: 0,
-    range: 50,
-    checkbox: false,
-    radio: undefined,
-    select: undefined,
-    textarea: "",
-  };
+describe("Inline default values are set appropriately", () => {
+  (Object.keys(defaultInputsProps) as InputType[]).forEach((componentType) => {
+    const testProps = defaultInputsProps[componentType];
 
-  (Object.keys(unassignedDefaultValues) as (keyof typeof unassignedDefaultValues)[]).forEach((inputType) => {
-    test(`input of type "${inputType}" should default to "${
-      unassignedDefaultValues[inputType]
-    }" (${typeof unassignedDefaultValues[inputType]})`, async () => {
-      const {
-        result: { current: form },
-      } = renderHook(() => useForm("test-form"));
-      await render(<FormWithInputs form={form} inputs={{ [inputType]: undefined }} />);
-      waitFor(() => expect(form.getValue(`${inputType}-input`)).toBe(unassignedDefaultValues[inputType]));
+    testProps.forEach((props) => {
+      it(`sets the default value for a ${props.name} input in Forms`, async () => {
+        const form = setupFormHook();
+
+        await render(<TestInput form={form} componentType={componentType} props={props} />);
+        expect(form.getValue(props.name)).toBe(props.defaultValue);
+      });
+
+      it(`sets the default value for a ${props.name} input in DOM`, async () => {
+        const form = setupFormHook();
+
+        const utils = await render(<TestInput form={form} componentType={componentType} props={props} />);
+
+        if (componentType === "custom") {
+          const el = (await utils.findByLabelText(props.name + "-input-values")) as HTMLFormElement;
+          expect(el.textContent).toBe(((props as CustomInputProps)?.defaultValue || []).join(""));
+        } else {
+          const el = (await utils.findByLabelText("test-form")) as HTMLFormElement;
+          const formData = new FormData(el);
+
+          if (componentType === "checkbox") {
+            expect(formData.get(props.name)).toBe(props.defaultValue ? (props as CheckboxProps).value : null);
+          } else {
+            expect(formData.get(props.name)).toBe(String(props.defaultValue));
+          }
+        }
+      });
     });
   });
 });
 
-describe("Undefined default values are properly typed", () => {
-  const defaultValues: DefaultValuesPerInputType = {
-    text: "text input default value",
-    number: 100,
-    range: 50,
-    checkbox: true,
-    radio: "second-radio",
-    select: "third-option",
-    textarea: "textarea default value",
+describe("useForm default values are set appropriately", () => {
+  const setupFormHook = () => {
+    const {
+      result: { current: form },
+    } = renderHook(() =>
+      useForm("test-form", {
+        defaultValues: validDefaultValues,
+      })
+    );
+    return form;
   };
 
-  (Object.keys(defaultValues) as (keyof typeof defaultValues)[]).forEach((inputType) => {
-    test(`input of type "${inputType}" should default to "${defaultValues[inputType]}" (${typeof defaultValues[
-      inputType
-    ]})`, async () => {
-      const {
-        result: { current: form },
-      } = renderHook(() => useForm("test-form"));
+  (Object.keys(defaultInputsProps) as InputType[]).forEach((componentType) => {
+    const testProps = defaultInputsProps[componentType];
 
-      await render(<FormWithInputs form={form} inputs={{ [inputType]: undefined }} />);
+    testProps.forEach((props) => {
+      const defaultValue = props.defaultValue;
+      it(`sets the default value for a ${props.name} input in Froms`, async () => {
+        const form = setupFormHook();
+        await render(<TestInput form={form} componentType={componentType} props={props} />);
+        expect(form.getValue(props.name)).toBe(defaultValue);
+      });
 
-      waitFor(() => expect(form.getValue(`${inputType}-input`)).toBe(defaultValues[inputType]));
+      it(`sets the default value for a ${props.name} input in DOM`, async () => {
+        const form = setupFormHook();
+        const utils = await render(<TestInput form={form} componentType={componentType} props={props} />);
+
+        if (componentType === "custom") {
+          const el = (await utils.findByLabelText(props.name + "-input-values")) as HTMLFormElement;
+
+          if (
+            !Array.isArray(defaultValue) ||
+            (Array.isArray(defaultValue) && defaultValue.some((v) => typeof v !== "string"))
+          ) {
+            return fail("Default value for custom-input must be an array of strings");
+          }
+
+          return expect(el.textContent).toBe((defaultValue || []).join(""));
+        } else {
+          if (componentType === "checkbox") {
+            const el = (await utils.findByLabelText(props.name)) as HTMLFormElement;
+            if (defaultValue) {
+              expect(el).toBeChecked();
+            } else {
+              expect(el).not.toBeChecked();
+            }
+          } else {
+            const el = (await utils.findByLabelText("test-form")) as HTMLFormElement;
+            const formData = new FormData(el);
+            expect(formData.get(props.name)).toBe(String(defaultValue));
+          }
+        }
+      });
     });
   });
 });
+
+/*
+Not used but to proud of them to delete them:
+
+type SetPropertyAsAny<T, K extends keyof T> = Omit<T, K> & { [key in K]: any };
+type InvalidTestProps = {
+  [K in keyof TestProps]: SetPropertyAsAny<TestProps[K][number], "defaultValue">[];
+}; */

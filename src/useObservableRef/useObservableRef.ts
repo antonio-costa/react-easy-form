@@ -47,7 +47,10 @@ export const useObservableRef = <T>(initialValue: T): Observable<T> => {
         } else {
           value.current = newValue;
         }
-        subscriptions.current.forEach((cb) => cb(value.current));
+
+        subscriptions.current.forEach((cb) => {
+          cb(value.current);
+        });
 
         if (triggerKeyObservables) {
           triggerKeyObservables.forEach((triggeredKey) => {
