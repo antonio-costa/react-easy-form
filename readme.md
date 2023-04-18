@@ -15,6 +15,7 @@
 
 - Add error handling (generic function to catch thrown errors)
 - Fix `ref` type of `CustomFieldController`
+- Cleanup git repository
 
 ### Done
 
